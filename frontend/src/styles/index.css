@@ -1,0 +1,294 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: #f1f5f9;
+  --surface: #ffffff;
+  --accent: #4f46e5;
+  --accent-soft: rgba(79, 70, 229, 0.1);
+  --glass: rgba(255, 255, 255, 0.7);
+  --sidebar: #ffffff;
+  
+  --ease-liquid: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #0f172a;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #1e293b;
+  --surface: #0f172a;
+  --glass: rgba(2, 6, 23, 0.7);
+  --sidebar: #020617;
+}
+
+/* Default Interactive Transitions */
+a, button, input, select, textarea {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  @apply bg-slate-50 text-slate-900 transition-colors duration-500 min-h-screen relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('/bg-library.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-50;
+  background-image: linear-gradient(rgba(2, 6, 23, 0.95), rgba(2, 6, 23, 0.98)), url('/bg-library.png');
+}
+
+/* Fix text contrast on emerald background colors */
+.bg-brand-400, .bg-brand-500, .bg-brand-600, .bg-brand-700 {
+  color: #ffffff !important;
+}
+.bg-brand-400 *, .bg-brand-500 *, .bg-brand-600 *, .bg-brand-700 * {
+  color: #ffffff !important;
+}
+
+.bg-theme-main { background-color: var(--bg-primary); }
+.bg-theme-card { background-color: var(--bg-secondary); }
+.bg-theme-surface { background-color: var(--bg-tertiary); }
+.text-theme-main { color: var(--text-primary); }
+.text-theme-secondary { color: var(--text-secondary); }
+.text-theme-muted { color: var(--text-muted); }
+.border-theme-soft { border-color: var(--border); }
+
+.glass-theme {
+  background-color: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.reader-mode * {
+  user-select: none;
+}
+
+@layer components {
+  .btn-premium {
+    @apply flex items-center gap-3 rounded-2xl bg-brand-600 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-brand-600/10 hover:bg-brand-500 transition-all hover:-translate-y-1 active:scale-95;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* React Quill Premium Theme Overrides */
+.quill-premium .ql-toolbar.ql-snow {
+  border: none !important;
+  background-color: var(--bg-tertiary) !important;
+  border-radius: 1.5rem 1.5rem 0 0 !important;
+  padding: 1.5rem !important;
+  border-bottom: 2px solid var(--border) !important;
+}
+
+.quill-premium .ql-container.ql-snow {
+  border: none !important;
+  background-color: var(--bg-secondary) !important;
+  border-radius: 0 0 1.5rem 1.5rem !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 1rem !important;
+  min-height: 400px;
+}
+
+.quill-premium .ql-editor {
+  padding: 2rem !important;
+  color: var(--text-primary) !important;
+  line-height: 1.8 !important;
+}
+
+.quill-premium .ql-editor.ql-blank::before {
+  color: var(--text-muted) !important;
+  font-style: italic !important;
+  left: 2rem !important;
+}
+
+.dark .quill-premium .ql-stroke {
+  stroke: var(--text-primary) !important;
+}
+
+.dark .quill-premium .ql-fill {
+  fill: var(--text-primary) !important;
+}
+
+.dark .quill-premium .ql-picker {
+  color: var(--text-primary) !important;
+}
+
+.dark .quill-premium .ql-picker-options {
+  background-color: var(--bg-tertiary) !important;
+  border: none !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .quill-premium .ql-picker-item:hover {
+  color: var(--accent) !important;
+}
+
+/* =========================================
+   GLOBAL THEME ENFORCEMENT 
+   (True Premium Dark Theme)
+   ========================================= */
+
+/* Deep Background Image over the dark base */
+body, .dark body {
+  background-image: linear-gradient(rgba(2, 6, 23, 0.95), rgba(2, 6, 23, 0.95)), url('/bg-library.png') !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+}
+
+/* Base Fallbacks for elements missing dark: utility classes */
+.dark .bg-white {
+  background-color: #0f172a !important;
+}
+
+
+
+/* Primary Buttons Override */
+.bg-brand-600, .bg-brand-500, .btn-premium {
+  background-color: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2) !important;
+}
+
+.bg-brand-600 *, .bg-brand-500 *, .btn-premium * {
+  color: #ffffff !important;
+}
+
+.bg-brand-600:hover, .bg-brand-500:hover, .btn-premium:hover {
+  background-color: #059669 !important;
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.3) !important;
+}
+
+/* General Link Colors */
+.dark .text-slate-900, .dark .text-slate-800 {
+  color: #f8fafc;
+}
+.dark .text-brand-600 {
+  color: #10b981 !important;
+}
+/* =========================================
+   MODERN MOBILE TABLES (Card Stack Way)
+   ========================================= */
+
+@media (max-width: 1024px) {
+  .modern-table {
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .modern-table thead {
+    display: none; /* Hide headers on mobile */
+  }
+
+  .modern-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .modern-table tr {
+    display: block;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+  }
+
+  .modern-table tr:hover {
+    transform: translateY(-4px);
+  }
+
+  .modern-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    font-size: 0.875rem;
+  }
+
+  .modern-table td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  /* Use data-label attribute for table headers on mobile */
+  .modern-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    text-align: left;
+    margin-right: 1rem;
+  }
+
+  /* Special handling for Book Details / Subject in cards */
+  .modern-table td[data-label="Book Details"],
+  .modern-table td[data-label="User"],
+  .modern-table td[data-label="Subject"] {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 0.5rem;
+  }
+
+  .modern-table td[data-label="Book Details"]::before,
+  .modern-table td[data-label="User"]::before,
+  .modern-table td[data-label="Subject"]::before {
+    margin-bottom: 0.25rem;
+  }
+}
+
+/* Header Responsiveness Fixes */
+@media (max-width: 768px) {
+  h1 { font-size: 1.75rem !important; }
+  h2 { font-size: 1.5rem !important; }
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}
