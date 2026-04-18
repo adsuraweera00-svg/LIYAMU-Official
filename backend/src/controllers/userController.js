@@ -25,7 +25,9 @@ export const updateProfile = async (req, res) => {
   
   // Handle file upload for profile picture
   if (req.file) {
-    req.user.profilePicture = `/uploads/${req.file.filename}`;
+    req.user.profilePicture = req.file.path.startsWith('http') 
+      ? req.file.path 
+      : `/uploads/${req.file.filename}`;
   }
   
   if (theme) req.user.settings.theme = theme;

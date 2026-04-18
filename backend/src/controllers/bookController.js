@@ -22,8 +22,16 @@ export const createBook = async (req, res) => {
   let pdfUrl = req.body.pdfUrl;
 
   if (req.files) {
-    if (req.files.cover) coverUrl = `/uploads/${req.files.cover[0].filename}`;
-    if (req.files.pdf) pdfUrl = `/uploads/${req.files.pdf[0].filename}`;
+    if (req.files.cover) {
+      coverUrl = req.files.cover[0].path.startsWith('http') 
+        ? req.files.cover[0].path 
+        : `/uploads/${req.files.cover[0].filename}`;
+    }
+    if (req.files.pdf) {
+      pdfUrl = req.files.pdf[0].path.startsWith('http') 
+        ? req.files.pdf[0].path 
+        : `/uploads/${req.files.pdf[0].filename}`;
+    }
   }
 
   const isPro = req.user.isPro;

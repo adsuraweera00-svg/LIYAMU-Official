@@ -91,7 +91,9 @@ export const submitCreditRequest = async (req, res) => {
   if (!req.file) throw new ApiError(400, 'Payment slip is required');
   if (!amount || !price) throw new ApiError(400, 'Invalid amount or price');
 
-  const slipUrl = `/uploads/${req.file.filename}`;
+  const slipUrl = req.file.path.startsWith('http') 
+    ? req.file.path 
+    : `/uploads/${req.file.filename}`;
 
   const request = await CreditRequest.create({
     user: req.user._id,

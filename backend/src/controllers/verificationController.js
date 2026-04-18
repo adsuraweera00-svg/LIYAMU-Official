@@ -6,6 +6,7 @@ import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { notifyAdmins } from '../utils/notificationHelper.js';
 import { ApiError } from '../utils/apiError.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 export const submitVerification = async (req, res) => {
   const { name, idNumber, contactNumber } = req.body;
@@ -13,7 +14,9 @@ export const submitVerification = async (req, res) => {
   if (existing) throw new ApiError(400, 'Pending request already exists');
   
   // Handle file upload for verification document
-  const documentUrl = req.file ? `/uploads/${req.file.filename}` : req.body.documentUrl;
+  const documentUrl = req.file 
+    ? (req.file.path.startsWith('http') ? req.file.path : `/uploads/${req.file.filename}`)
+    : req.body.documentUrl;
   
   if (!documentUrl) throw new ApiError(400, 'Verification document is required');
 
@@ -79,12 +82,14 @@ export const decideVerification = async (req, res) => {
       });
     }
 
-    // PDF Certificate Generation (existing logic)
+    // PDF Certificate Generation
     const outputDir = path.resolve('uploads');
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
     const pdfPath = path.join(outputDir, `verification-${author._id}.pdf`);
     const doc = new PDFDocument();
-    doc.pipe(fs.createWriteStream(pdfPath));
+    
+    const stream = fs.createWriteStream(pdfPath);
+    doc.pipe(stream);
     doc.fontSize(18).text('Verified Author Certificate');
     doc.moveDown();
     doc.fontSize(12).text(`User name: ${author.name}`);
@@ -93,6 +98,26 @@ export const decideVerification = async (req, res) => {
     doc.text(`Verified date: ${new Date().toLocaleDateString()}`);
     doc.text(`Approved by: ${req.user.name}`);
     doc.end();
+
+    stream.on('finish', async () => {
+      try {
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+          const result = await cloudinary.uploader.upload(pdfPath, {
+            folder: 'liyamu/certificates',
+            resource_type: 'auto'
+          });
+          // Update the request with the Cloudinary URL if needed, 
+          // though currently the model might not have a separate field for certificate URL.
+          // If we want the user to download it later, we should store it.
+          request.certificateUrl = result.secure_url;
+          await request.save();
+        }
+        // Clean up local file after upload
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+      } catch (err) {
+        console.error('Failed to upload certificate to Cloudinary:', err);
+      }
+    });
   }
 
   await Notification.create({
