@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIYAMU - Literary Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 48px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .info-section h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .info-section p {
+            color: #555;
+            line-height: 1.8;
+            margin-bottom: 10px;
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .tech-item {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .tech-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .tech-item span {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+            color: #999;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 40px 20px;
+            }
+            
+            h1 {
+                font-size: 36px;
+            }
+            
+            .tech-stack {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LIYAMU</h1>
+        <p class="subtitle">A comprehensive literary platform connecting authors, readers, and creative minds</p>
+        
+        <div class="info-section">
+            <h2>📚 Project Overview</h2>
+            <p>LIYAMU is a full-stack web application designed to empower authors, readers, and creative professionals. The platform provides tools for publishing, discovering, and engaging with literary content.</p>
+        </div>
+        
+        <div class="info-section">
+            <h2>🛠 Tech Stack</h2>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <strong>Frontend</strong>
+                    <span>React • Vite • Tailwind CSS</span>
+                </div>
+                <div class="tech-item">
+                    <strong>Backend</strong>
+                    <span>Node.js • Express • MongoDB</span>
+                </div>
+                <div class="tech-item">
+                    <strong>Authentication</strong>
+                    <span>JWT • Secure Password Hashing</span>
+                </div>
+                <div class="tech-item">
+                    <strong>Storage</strong>
+                    <span>Cloudinary • File Management</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h2>📁 Repository Structure</h2>
+            <p><strong>Backend:</strong> RESTful API with controllers, models, middleware, and authentication</p>
+            <p><strong>Frontend:</strong> React SPA with routing, state management, and responsive UI</p>
+            <p><strong>Features:</strong> Book publishing, user profiles, creative works, credits system, earnings tracking, and more</p>
+        </div>
+        
+        <div class="links">
+            <a href="https://github.com/liyamuowner/LIYAMU-1.0" class="btn btn-primary">View on GitHub</a>
+            <a href="https://github.com/liyamuowner/LIYAMU-1.0/blob/main/README.md" class="btn btn-secondary">Read Documentation</a>
+        </div>
+        
+        <div class="footer">
+            <p>LIYAMU © 2026 • Open Source Literary Platform</p>
+        </div>
+    </div>
+</body>
+</html>
