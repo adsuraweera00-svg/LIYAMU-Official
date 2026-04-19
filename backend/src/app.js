@@ -6,6 +6,8 @@ import hpp from 'hpp';
 import mongoSanitize from 'express-mongo-sanitize';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import 'express-async-errors';
 
 import authRoutes from './routes/authRoutes.js';
@@ -47,7 +49,20 @@ app.use('/api/pro', proRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/contacts', contactRoutes);
-app.use(notFound);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(frontendPath, 'index.html'));
+  });
+} else {
+  app.use(notFound);
+}
+
 app.use(errorHandler);
 
 export default app;

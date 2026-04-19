@@ -131,9 +131,9 @@ const ProfilePage = () => {
   return (
     <div className="space-y-8 pb-20">
       {/* Header & Badge */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 rounded-[2.5rem] bg-slate-900 p-10 text-white shadow-2xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 rounded-3xl md:rounded-[2.5rem] bg-slate-900 p-6 sm:p-10 text-white shadow-2xl relative overflow-hidden">
         <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-brand-600/20 to-transparent pointer-events-none" />
-        <div className="flex items-center gap-8 relative z-10">
+        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 relative z-10 w-full sm:w-auto">
           <div className="relative group">
             <div className={`h-24 w-24 rounded-[2rem] ${badge.color} flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden`}>
                {profilePicturePreview ? (
@@ -155,8 +155,8 @@ const ProfilePage = () => {
             </div>
           </div>
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tight leading-none text-white">{auth?.name}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none text-white text-center sm:text-left">{auth?.name}</h1>
+            <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-3">
                <span className={`rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest ${badge.color}`}>
                  {badge.label}
                </span>
@@ -169,7 +169,7 @@ const ProfilePage = () => {
         {!isAuthor && (
            <Link 
             to="/dashboard/verification"
-            className="rounded-2xl bg-brand-600 px-8 py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-brand-600/20 hover:bg-brand-500 transition-all hover:-translate-y-1 active:scale-95 z-10"
+            className="w-full sm:w-auto text-center rounded-2xl bg-brand-600 px-8 py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-brand-600/20 hover:bg-brand-500 transition-all hover:-translate-y-1 active:scale-95 z-10"
            >
              Apply to be an Author
            </Link>
@@ -179,9 +179,9 @@ const ProfilePage = () => {
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Settings form */}
         <div className="lg:col-span-2 space-y-8">
-           <div className="rounded-[2.5rem] bg-white p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+           <div className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
                <div className="flex items-center justify-between mb-10">
-                <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-3 dark:text-white">
+                <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-3 dark:text-white">
                    <User size={24} className="text-brand-600" /> Account Settings
                 </h2>
                 {message && (
@@ -220,7 +220,7 @@ const ProfilePage = () => {
                 
                 <div className="space-y-2 md:col-span-2 border-t border-slate-50 pt-8 mt-4 dark:border-slate-800">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-6 dark:text-white">Social Connections</h3>
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
                     <div className="relative">
                       <Facebook className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                       <input className="w-full rounded-xl bg-slate-50 py-3 pl-12 pr-4 text-[11px] font-bold border-none dark:bg-slate-800 dark:text-white" value={form.socialLinks.facebook} onChange={(e) => setForm({ ...form, socialLinks: { ...form.socialLinks, facebook: e.target.value } })} placeholder="Facebook profile" />
@@ -254,7 +254,7 @@ const ProfilePage = () => {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-[2.5rem] bg-white p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800"
+                className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800"
               >
                  <div className="flex items-center justify-between mb-8">
                     <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-3 dark:text-white">
@@ -302,7 +302,7 @@ const ProfilePage = () => {
             <motion.div 
                initial={{ opacity: 0, y: 20 }}
                animate={{ opacity: 1, y: 0 }}
-               className="rounded-[2.5rem] bg-white p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800"
+               className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800"
             >
                <div className="flex items-center justify-between mb-8">
                   <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-3 dark:text-white">
@@ -315,8 +315,8 @@ const ProfilePage = () => {
 
                <div className="space-y-4">
                   {bookmarkedWorks.map((work) => (
-                     <Link to={`/dashboard/creative/${work._id}`} key={work._id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all group dark:bg-slate-800/50 dark:hover:border-slate-700">
-                        <div className="flex items-center gap-4">
+                     <Link to={`/dashboard/creative/${work._id}`} key={work._id} className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 rounded-2xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all group dark:bg-slate-800/50 dark:hover:border-slate-700">
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
                            <div className="h-10 w-10 overflow-hidden rounded-xl bg-slate-200 dark:bg-slate-800">
                               {work.author?.profilePicture ? (
                                 <img src={work.author.profilePicture.startsWith('http') ? work.author.profilePicture : `${API_URL}${work.author.profilePicture}`} className="h-full w-full object-cover" alt="" />
@@ -357,7 +357,7 @@ const ProfilePage = () => {
 
         {/* Info card */}
         <div className="space-y-6">
-          <div className="rounded-[2.5rem] bg-brand-600 p-10 text-white">
+          <div className="rounded-3xl md:rounded-[2.5rem] bg-brand-600 p-6 sm:p-10 text-white">
             <h3 className="text-xl font-black uppercase tracking-tight leading-tight">Your Portfolio Summary</h3>
             <p className="mt-4 text-xs font-medium text-brand-100 leading-relaxed">
               Your presence on Liyamu matters. Keep your profile updated to build trust with your readers and fellow authors.
@@ -376,7 +376,7 @@ const ProfilePage = () => {
             </div>
           </div>
           
-          <div className="rounded-[2.5rem] bg-white p-8 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+          <div className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-8 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 dark:text-slate-500">Change Password</h4>
               <form onSubmit={handlePasswordChange} className="space-y-4">
                  <div className="relative">
@@ -429,7 +429,7 @@ const ProfilePage = () => {
               </form>
            </div>
 
-           <div className="rounded-[2.5rem] bg-white p-8 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+           <div className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-8 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 dark:text-slate-500">Security & Privacy</h4>
               <button className="w-full rounded-2xl bg-slate-50 px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all dark:bg-slate-800 dark:text-slate-500 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 mb-4">
                  Terminate All Sessions
@@ -443,7 +443,7 @@ const ProfilePage = () => {
            </div>
            
            {/* Chat FAB */}
-           <div className="rounded-[2.5rem] bg-white p-8 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+           <div className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-8 border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 dark:text-slate-500">Need Help?</h4>
               <Link 
                 to="/dashboard/support"
@@ -460,7 +460,7 @@ const ProfilePage = () => {
         <motion.div 
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
-           className="rounded-[2.5rem] bg-white p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800 mt-8"
+           className="rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-10 border border-slate-100 dark:bg-slate-900 dark:border-slate-800 mt-8"
         >
            <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-3 dark:text-white">
@@ -505,7 +505,7 @@ const ProfilePage = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-md overflow-hidden rounded-[2.5rem] bg-white p-10 text-left shadow-2xl dark:bg-slate-900"
+              className="relative w-full max-w-md overflow-hidden rounded-3xl md:rounded-[2.5rem] bg-white p-6 sm:p-10 text-left shadow-2xl dark:bg-slate-900"
             >
               <div className="mb-6 h-16 w-16 rounded-[2rem] bg-rose-50 flex items-center justify-center text-rose-500 dark:bg-rose-500/10">
                 <Trash2 size={32} />
