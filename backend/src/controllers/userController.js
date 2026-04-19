@@ -3,9 +3,21 @@ import User from '../models/User.js';
 import Book from '../models/Book.js';
 import VerificationRequest from '../models/VerificationRequest.js';
 import Notification from '../models/Notification.js';
+import CreativeWork from '../models/CreativeWork.js';
 
 export const updateProfile = async (req, res) => {
-  const { name, email, phone, bio, theme, socialLinks } = req.body;
+  const { name, email, phone, bio, theme } = req.body;
+  let { socialLinks } = req.body;
+
+  // If socialLinks is a string (due to FormData), parse it
+  if (typeof socialLinks === 'string') {
+    try {
+      socialLinks = JSON.parse(socialLinks);
+    } catch (e) {
+      console.error('Failed to parse socialLinks:', e);
+      socialLinks = null;
+    }
+  }
   
   if (email && email !== req.user.email) {
     // Prevent changing the owner email
@@ -33,12 +45,18 @@ export const updateProfile = async (req, res) => {
   if (theme) req.user.settings.theme = theme;
   
   if (socialLinks) {
-    req.user.socialLinks = { ...req.user.socialLinks, ...socialLinks };
+    req.user.socialLinks = {
+      facebook: socialLinks.facebook !== undefined ? socialLinks.facebook : req.user.socialLinks.facebook,
+      whatsapp: socialLinks.whatsapp !== undefined ? socialLinks.whatsapp : req.user.socialLinks.whatsapp,
+      telegram: socialLinks.telegram !== undefined ? socialLinks.telegram : req.user.socialLinks.telegram,
+    };
+    req.user.markModified('socialLinks');
   }
 
   await req.user.save();
   res.json(req.user);
 };
+
 
 export const getAuthors = async (req, res) => {
   const authors = await User.find({ 
@@ -192,18 +210,10 @@ export const getAuthorProfile = async (req, res) => {
     if (!author) return res.status(404).json({ message: 'Author not found' });
 
     // Fetch author's books
-    const books = await Book.find({ author: id, status: 'published' }).sort({ createdAt: -1 });
+    const books = await Book.find({ author: id, status: 'approved' }).sort({ createdAt: -1 });
     
-    // Fetch author's creative works (In a real app, you'd import CreativeWork model)
-    // For now, we'll try to find if a CreativeWork model exists or just return empty
-    // Let's check for the CreativeWork model name first.
-    let creativeWorks = [];
-    try {
-      const CreativeWork = mongoose.model('CreativeWork');
-      creativeWorks = await CreativeWork.find({ author: id }).sort({ createdAt: -1 }).limit(10);
-    } catch (e) {
-      console.log("CreativeWork model not yet initialized in this process");
-    }
+    // Fetch author's creative works
+    const creativeWorks = await CreativeWork.find({ author: id, status: 'approved' }).sort({ createdAt: -1 }).limit(10);
 
     res.json({
       ...author,
