@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, ShieldCheck, Clock, Check, MoreVertical, MessageSquare } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { db } from '../../firebase/firebaseConfig';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
 const SupportPage = () => {
   const { auth } = useAuth();
@@ -11,22 +13,26 @@ const SupportPage = () => {
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef();
 
-  const fetchMessages = async () => {
-    try {
-      const { data } = await api.get('/users/chat');
-      setMessages(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000); // Poll every 5s
-    return () => clearInterval(interval);
-  }, []);
+    if (!auth.user?.id) return;
+
+    const q = query(
+      collection(db, 'chatMessages'),
+      where('user', '==', auth.user.id),
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMessages(msgs);
+      setLoading(false);
+    }, (err) => {
+      console.error('Firestore subscription error:', err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth.user?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -87,7 +93,7 @@ const SupportPage = () => {
             const isAdmin = msg.sender === 'admin';
             return (
               <motion.div 
-                key={msg._id}
+                key={msg.id}
                 initial={{ opacity: 0, x: isAdmin ? -20 : 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className={`flex ${isAdmin ? 'justify-start' : 'justify-end'}`}

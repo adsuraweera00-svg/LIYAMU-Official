@@ -42,7 +42,7 @@ const AdminBooksPage = () => {
   const handleToggleVisibility = async (id) => {
     try {
       const { data } = await api.put(`/admin/books/${id}/visibility`);
-      setBooks(books.map(b => b._id === id ? { ...b, isHidden: data.isHidden } : b));
+      setBooks(books.map(b => b.id === id ? { ...b, isHidden: data.isHidden } : b));
     } catch (err) {
       console.error('Toggle visibility failed');
     }
@@ -51,7 +51,7 @@ const AdminBooksPage = () => {
   const handleDeleteBook = async (id) => {
     try {
       await api.delete(`/admin/books/${id}`);
-      setBooks(books.filter(b => b._id !== id));
+      setBooks(books.filter(b => b.id !== id));
       setConfirmAction({ show: false, type: '', id: null });
     } catch (err) {
       console.error('Delete failed');
@@ -138,7 +138,7 @@ const AdminBooksPage = () => {
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
               {filteredBooks.map((book) => (
-                <tr key={book._id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                <tr key={book.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                   <td className="px-5 py-5 md:px-8 md:py-6" data-label="Book Details">
                     <div className="flex items-center gap-3 md:gap-4">
                       <div className="h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800 shadow-sm transition-transform group-hover:scale-105">
@@ -201,7 +201,7 @@ const AdminBooksPage = () => {
                         </button>
                       )}
                       <button 
-                        onClick={() => handleToggleVisibility(book._id)}
+                        onClick={() => handleToggleVisibility(book.id)}
                         className={`h-8 md:h-9 w-8 md:w-9 flex items-center justify-center rounded-xl transition-all ${book.isHidden ? 'bg-amber-100 text-amber-600 hover:bg-amber-200 dark:bg-amber-900/30' : 'bg-slate-100 text-slate-400 hover:bg-amber-50 hover:text-amber-500 dark:bg-slate-800 dark:border-slate-700'}`}
                         title={book.isHidden ? 'Make Visible' : 'Hide from Public Library'}
                       >
@@ -209,7 +209,7 @@ const AdminBooksPage = () => {
                       </button>
                       {book.status !== 'approved' && (
                         <button 
-                          onClick={() => setConfirmAction({ show: true, type: 'approved', id: book._id })}
+                          onClick={() => setConfirmAction({ show: true, type: 'approved', id: book.id })}
                           className="h-8 md:h-9 px-3 md:px-4 flex items-center justify-center rounded-xl bg-emerald-600 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-600/10 hover:bg-emerald-500 transition-all active:scale-95"
                         >
                           Approve
@@ -217,14 +217,14 @@ const AdminBooksPage = () => {
                       )}
                       {book.status === 'pending' && (
                         <button 
-                          onClick={() => setRejectingId(book._id)}
+                          onClick={() => setRejectingId(book.id)}
                           className="h-8 md:h-9 px-3 md:px-4 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 transition-all dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10"
                         >
                           Reject
                         </button>
                       )}
                       <button 
-                        onClick={() => setConfirmAction({ show: true, type: 'delete', id: book._id })}
+                        onClick={() => setConfirmAction({ show: true, type: 'delete', id: book.id })}
                         className="h-8 md:h-9 w-8 md:w-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
                         title="Delete Book Permanently"
                       >
@@ -281,13 +281,13 @@ const AdminBooksPage = () => {
                 </div>
                 <div className="flex items-center gap-3">
                    <button 
-                     onClick={() => setConfirmAction({ show: true, type: 'approved', id: viewingBook._id })}
+                     onClick={() => setConfirmAction({ show: true, type: 'approved', id: viewingBook.id })}
                      className="px-6 py-3 rounded-2xl bg-emerald-600 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20"
                    >
                      Approve
                    </button>
                    <button 
-                     onClick={() => setRejectingId(viewingBook._id)}
+                     onClick={() => setRejectingId(viewingBook.id)}
                      className="px-6 py-3 rounded-2xl bg-rose-600 text-[10px] font-black uppercase tracking-widest text-white hover:bg-rose-500 transition-all shadow-lg shadow-rose-600/20"
                    >
                      Reject

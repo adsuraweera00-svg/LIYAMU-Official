@@ -228,7 +228,7 @@ const PayoutsPage = () => {
                  ) : requests.map((req) => {
                     const status = statusMap[req.status];
                     return (
-                       <div key={req._id} className="group rounded-3xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all dark:bg-slate-800/50 dark:hover:border-slate-700">
+                       <div key={req.id} className="group rounded-3xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all dark:bg-slate-800/50 dark:hover:border-slate-700">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                              <div className="flex items-center gap-4">
                                 <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${status.color}`}>

@@ -27,8 +27,8 @@ const CreativeCornerPage = () => {
         });
         const worksWithLikes = data.map(work => ({
           ...work,
-          isLiked: auth ? work.likes?.includes(auth._id) : false,
-          isBookmarked: auth ? auth.bookmarkedWorks?.includes(work._id) : false
+          isLiked: auth ? work.likes?.includes(auth.id) : false,
+          isBookmarked: auth ? auth.bookmarkedWorks?.includes(work.id) : false
         }));
         setWorks(worksWithLikes);
       } catch (err) {
@@ -43,7 +43,7 @@ const CreativeCornerPage = () => {
   const toggleLike = async (id) => {
     try {
       const { data } = await api.post(`/creative/${id}/like`);
-      setWorks(prev => prev.map(w => w._id === id ? { 
+      setWorks(prev => prev.map(w => w.id === id ? { 
         ...w, 
         likesCount: data.likesCount,
         isLiked: data.isLiked 
@@ -56,13 +56,13 @@ const CreativeCornerPage = () => {
   const toggleBookmark = async (id) => {
     if (!auth) return;
     // Optimistic Update
-    setWorks(prev => prev.map(w => w._id === id ? { ...w, isBookmarked: !w.isBookmarked } : w));
+    setWorks(prev => prev.map(w => w.id === id ? { ...w, isBookmarked: !w.isBookmarked } : w));
     try {
       await api.post(`/users/bookmarks/${id}`);
     } catch (err) {
       console.error(err);
       // Revert if error
-      setWorks(prev => prev.map(w => w._id === id ? { ...w, isBookmarked: !w.isBookmarked } : w));
+      setWorks(prev => prev.map(w => w.id === id ? { ...w, isBookmarked: !w.isBookmarked } : w));
     }
   };
 
@@ -142,7 +142,7 @@ const CreativeCornerPage = () => {
           <AnimatePresence mode="popLayout">
             {works.map((work) => (
               <motion.div
-                key={work._id}
+                key={work.id}
                 layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -170,7 +170,7 @@ const CreativeCornerPage = () => {
                 </div>
 
                 {/* Work Content Preview */}
-                <Link to={`/dashboard/creative/${work._id}`} className="flex-1 block group/content">
+                <Link to={`/dashboard/creative/${work.id}`} className="flex-1 block group/content">
                   <h3 className="text-lg font-black text-slate-900 dark:text-white mb-3 group-hover/content:text-brand-600 transition-colors line-clamp-2 leading-tight">
                     {work.title}
                   </h3>
@@ -184,7 +184,7 @@ const CreativeCornerPage = () => {
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <button 
-                      onClick={() => toggleLike(work._id)}
+                      onClick={() => toggleLike(work.id)}
                       className={`flex items-center gap-1.5 transition-all active:scale-90 ${work.isLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}
                     >
                       <Heart size={16} fill={work.isLiked ? 'currentColor' : 'none'} />
@@ -197,7 +197,7 @@ const CreativeCornerPage = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={() => toggleBookmark(work._id)}
+                      onClick={() => toggleBookmark(work.id)}
                       className={`transition-all active:scale-90 ${work.isBookmarked ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-500'}`}
                     >
                       <Bookmark size={16} fill={work.isBookmarked ? 'currentColor' : 'none'} />

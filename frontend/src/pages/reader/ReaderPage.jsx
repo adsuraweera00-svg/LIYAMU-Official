@@ -242,7 +242,7 @@ const ReaderPage = () => {
               {book.reviews?.length > 0 ? (
                 book.reviews.map((r, i) => (
                   <motion.div 
-                    key={r._id}
+                    key={r.id}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}

@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, ShieldCheck, Clock, Check, MoreVertical, MessageSquare, Search, ChevronRight, Bell } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { db } from '../../firebase/firebaseConfig';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
 const AdminChatPage = () => {
   const [users, setUsers] = useState([]);
@@ -23,27 +25,27 @@ const AdminChatPage = () => {
     }
   };
 
-  const fetchMessages = async (userId) => {
-    try {
-      const { data } = await api.get(`/admin/chat/${userId}`);
-      setMessages(data);
-      api.put(`/admin/chat/read/${userId}`);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
     fetchUsers();
-    const interval = setInterval(fetchUsers, 10000); // Refresh list every 10s
+    const interval = setInterval(fetchUsers, 10000); // User list can be 10s
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (selectedUser) {
-      fetchMessages(selectedUser._id);
-      const interval = setInterval(() => fetchMessages(selectedUser._id), 5000);
-      return () => clearInterval(interval);
+      const q = query(
+        collection(db, 'chatMessages'),
+        where('user', '==', selectedUser.id),
+        orderBy('createdAt', 'asc')
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMessages(msgs);
+        api.put(`/admin/chat/read/${selectedUser.id}`);
+      });
+
+      return () => unsubscribe();
     }
   }, [selectedUser]);
 
@@ -61,7 +63,7 @@ const AdminChatPage = () => {
     try {
       const { data } = await api.post('/admin/chat', { 
         message: msg, 
-        recipientId: selectedUser._id 
+        recipientId: selectedUser.id 
       });
       setMessages(prev => [...prev, data]);
     } catch (err) {
@@ -97,10 +99,10 @@ const AdminChatPage = () => {
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
            {users.map(user => (
              <button 
-               key={user._id}
+               key={user.id}
                onClick={() => setSelectedUser(user)}
                className={`w-full flex items-center gap-3 p-4 rounded-2xl transition-all ${
-                 selectedUser?._id === user._id 
+                 selectedUser?.id === user.id 
                    ? 'bg-slate-900 text-white shadow-xl dark:bg-brand-600' 
                    : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400'
                }`}
@@ -157,7 +159,7 @@ const AdminChatPage = () => {
                 const isAdmin = msg.sender === 'admin';
                 return (
                   <motion.div 
-                    key={msg._id}
+                    key={msg.id}
                     initial={{ opacity: 0, x: isAdmin ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}

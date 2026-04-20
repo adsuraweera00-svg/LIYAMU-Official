@@ -1,12 +1,8 @@
-import Book from '../models/Book.js';
-import Purchase from '../models/Purchase.js';
-import Review from '../models/Review.js';
-import Notification from '../models/Notification.js';
-import User from '../models/User.js';
+import { adminFirestore, FieldValue } from '../config/firebase.js';
 import { notifyAdmins } from '../utils/notificationHelper.js';
-import CreditTransaction from '../models/CreditTransaction.js';
-import mongoose from 'mongoose';
 import { ApiError } from '../utils/apiError.js';
+
+const db = adminFirestore();
 
 export const createBook = async (req, res) => {
   const allowedRoles = ['author', 'verified_author', 'pro_writer'];
@@ -17,7 +13,6 @@ export const createBook = async (req, res) => {
   const { title, category, documentType, content, price = 0 } = req.body;
   if (!title || !category || !documentType) throw new ApiError(400, 'Missing required fields');
 
-  // Handle uploaded files
   let coverUrl = req.body.coverUrl;
   let pdfUrl = req.body.pdfUrl;
 
@@ -37,271 +32,297 @@ export const createBook = async (req, res) => {
   const isPro = req.user.isPro;
   const safePrice = isPro ? Number(price) || 0 : 0;
   
-  const book = await Book.create({
+  const bookData = {
     title,
     category,
     documentType,
-    content: documentType === 'text' ? content : '',
-    pdfUrl: documentType === 'pdf' ? pdfUrl : '',
-    coverUrl,
-    author: req.user._id,
+    content: documentType === 'text' ? (content || '') : '',
+    pdfUrl: documentType === 'pdf' ? (pdfUrl || '') : '',
+    coverUrl: coverUrl || '',
+    author: req.user.id,
     price: safePrice,
     isFree: safePrice === 0,
-  });
+    status: 'pending',
+    viewCount: 0,
+    sellCount: 0,
+    ratingAverage: 0,
+    ratingCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
 
-  await Notification.create({
-    user: req.user._id,
+  const docRef = await db.collection('books').add(bookData);
+
+  await db.collection('notifications').add({
+    user: req.user.id,
     title: 'Book submitted',
-    message: `${book.title} has been sent for admin review.`,
+    message: `${title} has been sent for admin review.`,
     type: 'book',
+    createdAt: new Date().toISOString(),
+    read: false
   });
 
-  // Notify Admins
   await notifyAdmins({
     title: 'Content Review Needed',
-    message: `A new book "${book.title}" needs review.`,
+    message: `A new book "${title}" needs review.`,
     type: 'book',
-    metadata: {
-      action_type: 'book_submission',
-      title: book.title,
-      authorName: req.user.name,
-      category: category
-    }
+    metadata: { action_type: 'book_submission', title, authorName: req.user.name, category }
   });
 
-  res.status(201).json(book);
+  res.status(201).json({ id: docRef.id, ...bookData });
 };
 
 export const getBooks = async (req, res) => {
   const { search = '', type } = req.query;
-  const query = {
-    status: 'approved',
-    isHidden: { $ne: true },
-    title: { $regex: search, $options: 'i' },
-  };
-  if (type === 'free') query.isFree = true;
-  if (type === 'buy') query.isFree = false;
-  const books = await Book.find(query)
-    .select('-content -pdfUrl')
-    .populate('author', 'name badges createdAt followersCount');
-  res.json(books);
+  let query = db.collection('books')
+    .where('status', '==', 'approved');
+
+  if (type === 'free') query = query.where('isFree', '==', true);
+  if (type === 'buy') query = query.where('isFree', '==', false);
+
+  const snapshot = await query.get();
+  let books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  if (search) {
+    const s = search.toLowerCase();
+    books = books.filter(b => b.title.toLowerCase().includes(s));
+  }
+
+  // Populate authors
+  const authorIds = [...new Set(books.map(b => b.author))];
+  const authors = {};
+  if (authorIds.length > 0) {
+    const authorSnapshot = await db.collection('users').where('__name__', 'in', authorIds).get();
+    authorSnapshot.forEach(doc => { authors[doc.id] = doc.data(); });
+  }
+
+  res.json(books.map(b => {
+    const a = authors[b.author];
+    return { ...b, author: { id: b.author, name: a?.name, badges: a?.badges, followersCount: a?.followersCount } };
+  }));
 };
 
 export const getMyBooks = async (req, res) => {
-  const books = await Book.find({ author: req.user._id }).sort({ createdAt: -1 });
-  res.json(books);
+  const snapshot = await db.collection('books')
+    .where('author', '==', req.user.id)
+    .orderBy('createdAt', 'desc')
+    .get();
+  res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 };
 
 export const getBookById = async (req, res) => {
-  const book = await Book.findById(req.params.id).populate('author', 'name badges followersCount');
-  if (!book) throw new ApiError(404, 'Book not found');
-  if (book.status !== 'approved' && String(book.author._id) !== String(req.user._id)) {
+  const bookRef = db.collection('books').doc(req.params.id);
+  const bookDoc = await bookRef.get();
+  if (!bookDoc.exists) throw new ApiError(404, 'Book not found');
+
+  const bookData = bookDoc.data();
+  const authorDoc = await db.collection('users').doc(bookData.author).get();
+  const authorData = authorDoc.data();
+
+  if (bookData.status !== 'approved' && String(bookData.author) !== String(req.user.id)) {
     throw new ApiError(403, 'Access denied');
   }
 
-  const reviews = await Review.find({ book: book._id })
-    .populate('user', 'name profilePicture')
-    .sort({ createdAt: -1 });
-
-  book.viewCount += 1;
-  await book.save();
+  const reviewsSnapshot = await db.collection('reviews')
+    .where('book', '==', req.params.id)
+    .orderBy('createdAt', 'desc')
+    .get();
   
-  const bookObj = book.toObject();
-  const isOwner = String(book.author._id) === String(req.user._id);
-  const isPurchased = req.user.purchasedBooks.some(id => String(id) === String(book._id));
+  // Optimized reviews population
+  const reviewerIds = [...new Set(reviewsSnapshot.docs.map(d => d.data().user))];
+  const reviewers = {};
+  if (reviewerIds.length > 0) {
+    const userSnap = await db.collection('users').where('__name__', 'in', reviewerIds).get();
+    userSnap.forEach(d => reviewers[d.id] = d.data());
+  }
+
+  const reviews = reviewsSnapshot.docs.map(d => {
+    const rData = d.data();
+    const uData = reviewers[rData.user];
+    return { id: d.id, ...rData, user: { id: rData.user, name: uData?.name, profilePicture: uData?.profilePicture } };
+  });
+
+  // Increment view count
+  await bookRef.update({ viewCount: (bookData.viewCount || 0) + 1 });
+  
+  const bookObj = { id: bookDoc.id, ...bookData };
+  const isOwner = String(bookData.author) === String(req.user.id);
+  const isPurchased = (req.user.purchasedBooks || []).some(id => String(id) === String(bookDoc.id));
   const isAdmin = req.user.role === 'admin';
 
-  if (!book.isFree && !isOwner && !isPurchased && !isAdmin) {
+  if (!bookData.isFree && !isOwner && !isPurchased && !isAdmin) {
     delete bookObj.content;
     delete bookObj.pdfUrl;
     bookObj.requiresPurchase = true;
   }
   
-  res.json({ ...bookObj, reviews });
+  res.json({ ...bookObj, author: { id: authorDoc.id, name: authorData?.name, badges: authorData?.badges, followersCount: authorData?.followersCount }, reviews });
 };
 
 export const purchaseBook = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const bookRef = db.collection('books').doc(req.params.id);
+  const userRef = db.collection('users').doc(req.user.id);
 
   try {
-    const book = await Book.findById(req.params.id).populate('author').session(session);
-    if (!book || book.status !== 'approved') throw new ApiError(404, 'Book not available');
-    if (book.isFree) throw new ApiError(400, 'This book is free');
-    
-    const user = await User.findById(req.user._id).session(session);
-    if (user.purchasedBooks.some((id) => String(id) === String(book._id))) {
-      throw new ApiError(400, 'Already purchased');
-    }
+    const result = await db.runTransaction(async (t) => {
+      const bDoc = await t.get(bookRef);
+      if (!bDoc.exists || bDoc.data().status !== 'approved') throw new Error('Book not available');
+      const bData = bDoc.data();
+      if (bData.isFree) throw new Error('This book is free');
 
-    const totalBalanceAvailable = (user.creditBalance || 0) + (user.earningsBalance || 0);
-    if (totalBalanceAvailable < book.price) {
-      throw new ApiError(400, `Insufficient credits. You need ${book.price} credits.`);
-    }
+      const uDoc = await t.get(userRef);
+      const uData = uDoc.data();
+      if ((uData.purchasedBooks || []).includes(req.params.id)) throw new Error('Already purchased');
 
-    const soldPrice = book.price;
-    const websiteTax = Math.floor(soldPrice * 0.1); 
-    const authorEarnings = soldPrice - websiteTax;
+      const price = bData.price;
+      const totalBalance = (uData.creditBalance || 0) + (uData.earningsBalance || 0);
+      if (totalBalance < price) throw new Error(`Insufficient credits. Need ${price}.`);
 
-    // Deduct credits (Unified Logic: Credit first, then Earnings)
-    let remainingToDeduct = soldPrice;
-    
-    if (user.creditBalance >= remainingToDeduct) {
-      user.creditBalance -= remainingToDeduct;
-    } else {
-      remainingToDeduct -= user.creditBalance;
-      user.creditBalance = 0;
-      user.earningsBalance -= remainingToDeduct;
-    }
+      const authorRef = db.collection('users').doc(bData.author);
+      const websiteTax = Math.floor(price * 0.1);
+      const authorEarnings = price - websiteTax;
 
-    user.purchasedBooks.push(book._id);
-    await user.save({ session });
+      // Deduct from buyer
+      let rem = price;
+      let newCB = uData.creditBalance || 0;
+      let newEB = uData.earningsBalance || 0;
 
-    // Add credits to author (always goes to earningsBalance now for clarity)
-    const author = await User.findById(book.author._id).session(session);
-    author.earningsBalance += authorEarnings;
-    await author.save({ session });
+      if (newCB >= rem) { newCB -= rem; } 
+      else { rem -= newCB; newCB = 0; newEB -= rem; }
 
-    // Update book sellCount
-    book.sellCount += 1;
-    await book.save({ session });
+      t.update(userRef, { 
+        creditBalance: newCB, 
+        earningsBalance: newEB, 
+        purchasedBooks: FieldValue.arrayUnion(req.params.id),
+        updatedAt: new Date().toISOString()
+      });
 
-    // Create Purchase record (for library tracking)
-    await Purchase.create([{
-      buyer: user._id, 
-      book: book._id, 
-      soldPrice, 
-      websiteTax, 
-      authorEarnings 
-    }], { session });
+      // Credit author
+      t.update(authorRef, { earningsBalance: FieldValue.increment(authorEarnings) });
+      t.update(bookRef, { sellCount: FieldValue.increment(1) });
 
-    // Create Credit Transactions
-    await CreditTransaction.create([
-      {
-        user: user._id,
-        type: 'spend',
-        amount: soldPrice,
-        description: `Purchased book: ${book.title}`,
-        metadata: { bookId: book._id }
-      },
-      {
-        user: author._id,
-        type: 'refund', // Or a new type 'earn' if we want to be specific, using 'refund' as a proxy for 'credit in' from sale
-        amount: authorEarnings,
-        description: `Sold book: ${book.title}`,
-        metadata: { bookId: book._id }
-      }
-    ], { session });
+      // Records
+      const purchaseRef = db.collection('purchases').doc();
+      t.set(purchaseRef, {
+        buyer: req.user.id, book: req.params.id, soldPrice: price, websiteTax, authorEarnings, createdAt: new Date().toISOString()
+      });
 
-    await session.commitTransaction();
+      const t1 = db.collection('creditTransactions').doc();
+      t.set(t1, { user: req.user.id, type: 'spend', amount: price, description: `Bought: ${bData.title}`, createdAt: new Date().toISOString() });
 
-    // Send Notifications (non-blocking)
-    Notification.insertMany([
-      {
-        user: user._id,
-        title: 'Purchase successful',
-        message: `You spent ${soldPrice} credits on ${book.title}.`,
-        type: 'purchase',
-      },
-      {
-        user: author._id,
-        title: 'New sale',
-        message: `${book.title} was sold. ${authorEarnings} credits added to your wallet.`,
-        type: 'earnings',
-      },
-    ]).catch(console.error);
+      const t2 = db.collection('creditTransactions').doc();
+      t.set(t2, { user: bData.author, type: 'refund', amount: authorEarnings, description: `Sold: ${bData.title}`, createdAt: new Date().toISOString() });
 
-    res.json({ success: true, balance: user.creditBalance });
+      return { newBalance: newCB, authorId: bData.author, title: bData.title, authorEarnings, price };
+    });
+
+    // Notifications (Async)
+    db.collection('notifications').add({
+      user: req.user.id, title: 'Purchase successful', message: `Spent ${result.price} on ${result.title}.`, type: 'purchase', createdAt: new Date().toISOString(), read: false
+    });
+    db.collection('notifications').add({
+      user: result.authorId, title: 'New sale', message: `${result.title} sold. +${result.authorEarnings} credits.`, type: 'earnings', createdAt: new Date().toISOString(), read: false
+    });
+
+    res.json({ success: true, balance: result.newBalance });
   } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
+    throw new ApiError(400, error.message);
   }
 };
 
 export const reviewBook = async (req, res) => {
   const { rating, comment } = req.body;
-  const book = await Book.findById(req.params.id);
-  if (!book) throw new ApiError(404, 'Book not found');
+  const bookRef = db.collection('books').doc(req.params.id);
+  const bookDoc = await bookRef.get();
+  if (!bookDoc.exists) throw new ApiError(404, 'Book not found');
 
-  await Review.findOneAndUpdate(
-    { book: book._id, user: req.user._id },
-    { rating, comment },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
-
-  const reviews = await Review.find({ book: book._id });
-  const avg = reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
-  book.ratingAverage = avg;
-  book.ratingCount = reviews.length;
-  await book.save();
-
-  // Notify Admins about the new review
-  await notifyAdmins({
-    title: 'New Book Review',
-    message: `${req.user.name} rated "${book.title}" ${rating} stars.`,
-    type: 'social',
-    metadata: {
-      action_type: 'book_review',
-      bookTitle: book.title,
-      reviewerName: req.user.name,
-      rating: rating
-    }
+  const reviewId = `${req.user.id}_${req.params.id}`;
+  await db.collection('reviews').doc(reviewId).set({
+    book: req.params.id,
+    user: req.user.id,
+    rating: Number(rating),
+    comment,
+    createdAt: new Date().toISOString()
   });
 
-  const authorBooks = await Book.find({ author: book.author, status: 'approved', ratingCount: { $gt: 0 } });
+  const reviewsSnapshot = await db.collection('reviews').where('book', '==', req.params.id).get();
+  const reviews = reviewsSnapshot.docs.map(d => d.data());
+  const avg = reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
+
+  await bookRef.update({ ratingAverage: avg, ratingCount: reviews.length });
+
+  await notifyAdmins({
+    title: 'New Book Review',
+    message: `${req.user.name} rated "${bookDoc.data().title}" ${rating} stars.`,
+    type: 'social',
+    metadata: { action_type: 'book_review', bookTitle: bookDoc.data().title, reviewerName: req.user.name, rating }
+  });
+
+  // Check for proWriter badge
+  const authorBooksSnapshot = await db.collection('books')
+    .where('author', '==', bookDoc.data().author)
+    .where('status', '==', 'approved')
+    .get();
+  
+  const authorBooks = authorBooksSnapshot.docs.map(d => d.data()).filter(b => b.ratingCount > 0);
   const authorAvg = authorBooks.length
     ? authorBooks.reduce((sum, item) => sum + (item.ratingAverage / 5) * 100, 0) / authorBooks.length
     : 0;
+
   if (authorAvg > 70) {
-    const author = await User.findById(book.author);
-    author.badges.proWriter = true;
-    await author.save();
+    await db.collection('users').doc(bookDoc.data().author).update({ 'badges.proWriter': true });
   }
 
-  res.json({ success: true, ratingAverage: book.ratingAverage });
+  res.json({ success: true, ratingAverage: avg });
 };
 
 export const getAuthorStats = async (req, res) => {
-  const stats = await Book.aggregate([
-    { $match: { author: req.user._id, status: 'approved' } },
-    {
-      $group: {
-        _id: null,
-        totalViews: { $sum: '$viewCount' },
-        totalSales: { $sum: '$sellCount' },
-        avgRating: { $avg: '$ratingAverage' },
-        bookCount: { $sum: 1 },
-      },
-    },
-  ]);
+  const snapshot = await db.collection('books')
+    .where('author', '==', req.user.id)
+    .where('status', '==', 'approved')
+    .get();
 
-  res.json(stats[0] || { totalViews: 0, totalSales: 0, avgRating: 0, bookCount: 0 });
+  let totalViews = 0, totalSales = 0, sumRating = 0, ratedCount = 0;
+  snapshot.docs.forEach(doc => {
+    const d = doc.data();
+    totalViews += (d.viewCount || 0);
+    totalSales += (d.sellCount || 0);
+    if (d.ratingCount > 0) {
+      sumRating += (d.ratingAverage || 0);
+      ratedCount++;
+    }
+  });
+
+  res.json({
+    totalViews,
+    totalSales,
+    avgRating: ratedCount > 0 ? sumRating / ratedCount : 0,
+    bookCount: snapshot.size
+  });
 };
 
 export const deleteBook = async (req, res) => {
-  const book = await Book.findById(req.params.id);
-  if (!book) throw new ApiError(404, 'Book not found');
+  const bookRef = db.collection('books').doc(req.params.id);
+  const bookDoc = await bookRef.get();
+  if (!bookDoc.exists) throw new ApiError(404, 'Book not found');
 
-  // Verify ownership
-  if (book.author.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, 'You can only delete your own books');
-  }
+  if (bookDoc.data().author !== req.user.id) throw new ApiError(403, 'Permission denied');
 
-  // Delete associated reviews
-  await Review.deleteMany({ book: book._id });
+  // Deleting reviews associated
+  const reviewsSnapshot = await db.collection('reviews').where('book', '==', req.params.id).get();
+  const batch = db.batch();
+  reviewsSnapshot.forEach(d => batch.delete(d.ref));
+  batch.delete(bookRef);
+  await batch.commit();
 
-  // Delete the book
-  await book.deleteOne();
-
-  // Notify the author
-  await Notification.create({
-    user: req.user._id,
+  await db.collection('notifications').add({
+    user: req.user.id,
     title: 'Book Deleted',
-    message: `Your book "${book.title}" has been permanently removed from the platform.`,
+    message: `Your book "${bookDoc.data().title}" has been removed.`,
     type: 'book',
+    createdAt: new Date().toISOString(),
+    read: false
   });
 
-  res.json({ success: true, message: 'Book deleted successfully' });
+  res.json({ success: true, message: 'Book deleted' });
 };

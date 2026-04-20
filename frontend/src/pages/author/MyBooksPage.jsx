@@ -21,7 +21,7 @@ const MyBooksPage = () => {
 
     try {
       await api.delete(`/books/${id}`);
-      setBooks(books.filter(b => b._id !== id));
+      setBooks(books.filter(b => b.id !== id));
       toast.success('Book deleted successfully');
     } catch (err) {
       console.error(err);
@@ -58,7 +58,7 @@ const MyBooksPage = () => {
             const status = getStatusBadge(book.status);
             return (
               <motion.div 
-                key={book._id}
+                key={book.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
@@ -93,7 +93,7 @@ const MyBooksPage = () => {
                       
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => handleDelete(book._id, book.title)}
+                          onClick={() => handleDelete(book.id, book.title)}
                           className="h-10 w-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 transition-all border border-rose-100/50"
                         >
                            <Trash2 size={18} />

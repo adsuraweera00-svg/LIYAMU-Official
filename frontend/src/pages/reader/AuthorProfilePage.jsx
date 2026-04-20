@@ -64,19 +64,19 @@ const AuthorProfilePage = () => {
 
   const handleFollow = async () => {
     if (!auth) return toast.error('Please login to follow authors');
-    const isFollowing = followingIds.includes(author._id);
+    const isFollowing = followingIds.includes(author.id);
     
     setFollowingIds(prev => isFollowing 
-      ? prev.filter(fid => fid !== author._id) 
-      : [...prev, author._id]
+      ? prev.filter(fid => fid !== author.id) 
+      : [...prev, author.id]
     );
 
     try {
-      const { data } = await api.post(`/users/follow/${author._id}`);
+      const { data } = await api.post(`/users/follow/${author.id}`);
       setAuthor(prev => ({ ...prev, followersCount: data.followersCount }));
       toast.success(isFollowing ? `Unfollowed ${author.name}` : `Following ${author.name}`);
     } catch (err) {
-      setFollowingIds(prev => isFollowing ? [...prev, author._id] : prev.filter(fid => fid !== author._id));
+      setFollowingIds(prev => isFollowing ? [...prev, author.id] : prev.filter(fid => fid !== author.id));
       toast.error('Connection error');
     }
   };
@@ -91,8 +91,8 @@ const AuthorProfilePage = () => {
   if (!author) return null;
 
   const badge = getRoleBadge(author.role);
-  const isFollowing = followingIds.includes(author._id);
-  const isMe = auth?._id === author._id;
+  const isFollowing = followingIds.includes(author.id);
+  const isMe = auth?.id === author.id;
 
   const container = {
     hidden: { opacity: 0 },
@@ -234,7 +234,7 @@ const AuthorProfilePage = () => {
                 className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
               >
                  {author.books?.length > 0 ? author.books.map((book) => (
-                   <motion.div key={book._id} variants={item} className="group relative overflow-hidden rounded-[2.5rem] glass-theme border border-white/5 p-6 hover:shadow-2xl transition-all">
+                   <motion.div key={book.id} variants={item} className="group relative overflow-hidden rounded-[2.5rem] glass-theme border border-white/5 p-6 hover:shadow-2xl transition-all">
                       <div className="flex gap-6">
                          <div className="h-40 w-28 shrink-0 overflow-hidden rounded-2xl shadow-xl group-hover:scale-105 transition-transform duration-500">
                             {book.coverUrl ? (
@@ -252,7 +252,7 @@ const AuthorProfilePage = () => {
                                </div>
                             </div>
                             <Link 
-                              to={`/dashboard/library/${book._id}`}
+                              to={`/dashboard/library/${book.id}`}
                               className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-600 hover:text-brand-500"
                             >
                                Read Now <ChevronLeft size={14} className="rotate-180" />
@@ -275,7 +275,7 @@ const AuthorProfilePage = () => {
                 className="grid gap-6 md:grid-cols-2"
               >
                  {author.creativeWorks?.length > 0 ? author.creativeWorks.map((work) => (
-                   <motion.div key={work._id} variants={item} className="group rounded-[2rem] glass-theme p-8 border border-white/5 hover:shadow-2xl transition-all">
+                   <motion.div key={work.id} variants={item} className="group rounded-[2rem] glass-theme p-8 border border-white/5 hover:shadow-2xl transition-all">
                       <div className="flex items-center justify-between mb-4">
                          <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-widest dark:bg-emerald-500/10 dark:text-emerald-400">
                             {work.category}
@@ -284,7 +284,7 @@ const AuthorProfilePage = () => {
                       </div>
                       <h4 className="text-xl font-black text-slate-900 dark:text-white mb-4 uppercase tracking-tight">{work.title}</h4>
                       <Link 
-                        to={`/dashboard/creative/${work._id}`}
+                        to={`/dashboard/creative/${work.id}`}
                         className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-brand-600"
                       >
                          Read Full Piece <ExternalLink size={12} />

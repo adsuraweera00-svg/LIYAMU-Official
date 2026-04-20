@@ -59,7 +59,7 @@ const ProfilePage = () => {
   const removeBookmark = async (id) => {
     try {
       await api.post(`/users/bookmarks/${id}`);
-      setBookmarkedWorks(prev => prev.filter(w => w._id !== id));
+      setBookmarkedWorks(prev => prev.filter(w => w.id !== id));
     } catch (err) {
       console.error(err);
     }
@@ -94,7 +94,7 @@ const ProfilePage = () => {
   const restoreWork = async (id) => {
     try {
       await api.post(`/creative/restore/${id}`);
-      setDeletedWorks(prev => prev.filter(w => w._id !== id));
+      setDeletedWorks(prev => prev.filter(w => w.id !== id));
       setMessage('Work restored successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
@@ -267,7 +267,7 @@ const ProfilePage = () => {
 
                  <div className="space-y-4">
                     {myBooks.map((book) => (
-                       <div key={book._id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all group dark:bg-slate-800/50 dark:hover:border-slate-700">
+                       <div key={book.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all group dark:bg-slate-800/50 dark:hover:border-slate-700">
                           <div className="flex items-center gap-4">
                              <div className="h-12 w-10 overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-800">
                                 {book.coverUrl && <img src={book.coverUrl.startsWith('http') ? book.coverUrl : `${API_URL}${book.coverUrl}`} className="h-full w-full object-cover" alt="" />}
@@ -315,7 +315,7 @@ const ProfilePage = () => {
 
                <div className="space-y-4">
                   {bookmarkedWorks.map((work) => (
-                     <Link to={`/dashboard/creative/${work._id}`} key={work._id} className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 rounded-2xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all group dark:bg-slate-800/50 dark:hover:border-slate-700">
+                     <Link to={`/dashboard/creative/${work.id}`} key={work.id} className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 rounded-2xl bg-slate-50 p-6 border border-transparent hover:border-slate-100 transition-all group dark:bg-slate-800/50 dark:hover:border-slate-700">
                         <div className="flex items-center gap-4 w-full sm:w-auto">
                            <div className="h-10 w-10 overflow-hidden rounded-xl bg-slate-200 dark:bg-slate-800">
                               {work.author?.profilePicture ? (
@@ -334,7 +334,7 @@ const ProfilePage = () => {
                              onClick={(e) => {
                                e.preventDefault();
                                e.stopPropagation();
-                               removeBookmark(work._id);
+                               removeBookmark(work.id);
                              }}
                              className="rounded-xl bg-white px-3 py-1.5 shadow-sm text-slate-400 hover:text-rose-500 transition-colors dark:bg-slate-800/80"
                            >
@@ -471,14 +471,14 @@ const ProfilePage = () => {
 
            <div className="grid gap-6 md:grid-cols-2">
               {deletedWorks.map((work) => (
-                 <div key={work._id} className="flex flex-col rounded-2xl bg-slate-50/50 p-6 border border-slate-100 dark:bg-slate-800/30 dark:border-slate-800">
+                 <div key={work.id} className="flex flex-col rounded-2xl bg-slate-50/50 p-6 border border-slate-100 dark:bg-slate-800/30 dark:border-slate-800">
                     <div className="flex justify-between items-start mb-4">
                        <h4 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white">{work.title}</h4>
                        <span className="text-[9px] font-bold text-slate-400">Deleted on {new Date(work.deletedAt).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-3 mt-auto">
                        <button 
-                         onClick={() => restoreWork(work._id)}
+                         onClick={() => restoreWork(work.id)}
                          className="flex-1 rounded-xl bg-white px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 border border-emerald-100 hover:bg-emerald-50 transition-all dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400"
                        >
                           Restore

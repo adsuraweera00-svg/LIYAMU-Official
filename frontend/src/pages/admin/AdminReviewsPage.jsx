@@ -45,7 +45,7 @@ const AdminReviewsPage = () => {
     if (!window.confirm('Delete this review permanently?')) return;
     try {
       await api.delete(`/admin/reviews/${id}`);
-      setReviews(reviews.filter(r => r._id !== id));
+      setReviews(reviews.filter(r => r.id !== id));
     } catch (err) {
       console.error('Delete failed');
     }
@@ -70,7 +70,7 @@ const AdminReviewsPage = () => {
 
     // Filter by Selected Book
     if (selectedBookId !== 'all') {
-      result = result.filter(r => r.book?._id === selectedBookId);
+      result = result.filter(r => r.book?.id === selectedBookId);
     } else if (showLatest && !search) {
       // If showing platform-wide and no search, limit to 20
       result = result.slice(0, 20);
@@ -113,7 +113,7 @@ const AdminReviewsPage = () => {
                 <option value="all">Platform-wide (Latest 20)</option>
                 <optgroup label="Filter by Specific Book">
                   {books.map(b => (
-                    <option key={b._id} value={b._id}>{b.title}</option>
+                    <option key={b.id} value={b.id}>{b.title}</option>
                   ))}
                 </optgroup>
               </select>
@@ -161,7 +161,7 @@ const AdminReviewsPage = () => {
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  key={review._id}
+                  key={review.id}
                   className="relative flex flex-col rounded-[2.5rem] bg-white p-8 border border-slate-100 shadow-xl shadow-slate-200/10 dark:bg-slate-900 dark:border-slate-800 transition-all hover:scale-[1.02] hover:border-brand-500/30"
                 >
                    <div className="flex justify-between items-start mb-6">
@@ -175,7 +175,7 @@ const AdminReviewsPage = () => {
                         </div>
                       </div>
                       <button 
-                        onClick={() => handleDelete(review._id)}
+                        onClick={() => handleDelete(review.id)}
                         className="h-9 w-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
                       >
                          <Trash2 size={16} />

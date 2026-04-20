@@ -127,6 +127,7 @@ const HomePage = () => {
               loop 
               muted 
               playsInline
+              preload="none"
               src="/video.mp4" 
               className="relative rounded-[3rem] object-cover shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] w-full h-[300px] md:h-[500px] border border-white dark:border-slate-800" 
             />
@@ -195,16 +196,17 @@ const HomePage = () => {
         </div>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {latestBooks.map((book) => (
-            <div key={book._id} className="group relative">
+            <div key={book.id} className="group relative">
               <div className="aspect-[3/4] overflow-hidden rounded-[2rem] bg-slate-100 border border-slate-100 shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-2 dark:bg-slate-800 dark:border-slate-700">
                 <img 
                   src={book.coverUrl ? (book.coverUrl.startsWith('http') ? book.coverUrl : `${API_URL}${book.coverUrl}`) : 'https://via.placeholder.com/300x400?text=No+Cover'} 
                   alt={book.title}
+                  loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center dark:bg-slate-950/60">
                    <button 
-                    onClick={() => auth ? navigate(`/dashboard/library/${book._id}`) : navigate('/auth')}
+                    onClick={() => auth ? navigate(`/dashboard/library/${book.id}`) : navigate('/auth')}
                     className="rounded-xl bg-white px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-900 hover:bg-brand-600 hover:text-white transition-all shadow-xl dark:bg-slate-900 dark:text-white dark:hover:bg-brand-500"
                    >
                      Read Now
@@ -233,7 +235,7 @@ const HomePage = () => {
         </div>
         <div className="grid gap-8 md:grid-cols-3">
           {latestCreative.map((work) => (
-            <div key={work._id} className="group flex flex-col glass-theme rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all hover:border-emerald-500/30">
+            <div key={work.id} className="group flex flex-col glass-theme rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all hover:border-emerald-500/30">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 border border-white/10">
@@ -267,7 +269,7 @@ const HomePage = () => {
                   <span className="text-xs font-black">{work.likesCount || 0}</span>
                 </div>
                 <button 
-                  onClick={() => auth ? navigate(`/dashboard/creative/${work._id}`) : navigate('/auth')}
+                  onClick={() => auth ? navigate(`/dashboard/creative/${work.id}`) : navigate('/auth')}
                   className="rounded-xl bg-slate-900 px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white hover:bg-brand-600 transition-all dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-brand-500 hover:text-white"
                 >
                   Read Story
@@ -313,6 +315,7 @@ const HomePage = () => {
                 key={currentSlide}
                 src={storyImages[currentSlide]} 
                 alt={`About slide ${currentSlide + 1}`} 
+                loading="lazy"
                 initial={{ opacity: 0, scale: 1.1 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}

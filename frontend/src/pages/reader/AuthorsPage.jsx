@@ -61,7 +61,7 @@ const AuthorsPage = () => {
       const { data } = await api.post(`/users/follow/${authorId}`);
       // Sync actual count if needed
       setAuthors(prev => prev.map(a => 
-        a._id === authorId ? { ...a, followersCount: data.followersCount } : a
+        a.id === authorId ? { ...a, followersCount: data.followersCount } : a
       ));
     } catch (err) {
       // Revert on error
@@ -161,12 +161,12 @@ const AuthorsPage = () => {
       >
         {filteredAuthors.map((author) => {
           const badge = getRoleBadge(author.role);
-          const isFollowing = followingIds.includes(author._id);
-          const isMe = auth?._id === author._id;
+          const isFollowing = followingIds.includes(author.id);
+          const isMe = auth?.id === author.id;
 
           return (
             <motion.div 
-               key={author._id}
+               key={author.id}
                variants={item}
                className="group relative flex flex-col rounded-3xl md:rounded-[2.5rem] bg-white p-6 md:p-8 shadow-xl shadow-slate-200/20 hover:shadow-2xl transition-all duration-500 border border-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:shadow-none hover:border-brand-500/20"
             >
@@ -217,7 +217,7 @@ const AuthorsPage = () => {
                <div className="flex flex-col gap-3">
                   {!isMe && (
                     <button 
-                      onClick={() => handleFollow(author._id)}
+                      onClick={() => handleFollow(author.id)}
                       className={`
                          w-full flex items-center justify-center gap-3 rounded-2xl px-6 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all
                          ${isFollowing 
@@ -233,7 +233,7 @@ const AuthorsPage = () => {
                     </button>
                   )}
                   <Link 
-                    to={`/dashboard/authors/${author._id}`}
+                    to={`/dashboard/authors/${author.id}`}
                     className="w-full flex items-center justify-center gap-3 rounded-2xl bg-slate-50 px-6 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-all dark:bg-slate-800 dark:text-slate-300"
                   >
                      View Profile

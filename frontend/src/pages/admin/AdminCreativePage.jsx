@@ -45,7 +45,7 @@ const AdminCreativePage = () => {
     if (!window.confirm('Are you sure you want to permanently delete this creative work? The author will be notified.')) return;
     try {
       await api.delete(`/admin/creative/${id}`);
-      setWorks(works.filter(w => w._id !== id));
+      setWorks(works.filter(w => w.id !== id));
     } catch (err) {
       console.error(err);
       alert('Failed to delete work.');
@@ -127,7 +127,7 @@ const AdminCreativePage = () => {
                   </tr>
                 ) : (
                   filteredWorks.map((work) => (
-                    <tr key={work._id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                    <tr key={work.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                       <td className="px-8 py-6" data-label="Content Detail">
                         <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{work.title}</p>
                         <div className="flex gap-2 mt-1">
@@ -162,14 +162,14 @@ const AdminCreativePage = () => {
                             </button>
                             {work.status === 'pending' && (
                               <button 
-                                onClick={() => setConfirmAction({ show: true, type: 'approved', id: work._id })}
+                                onClick={() => setConfirmAction({ show: true, type: 'approved', id: work.id })}
                                 className="px-4 h-9 rounded-xl bg-emerald-600 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
                               >
                                 Approve
                               </button>
                             )}
                             <button 
-                              onClick={() => deleteWork(work._id)}
+                              onClick={() => deleteWork(work.id)}
                               className="h-9 w-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white transition-all"
                             >
                               <Trash2 size={16} />
@@ -217,13 +217,13 @@ const AdminCreativePage = () => {
                     {selectedWork.status === 'pending' && (
                        <>
                          <button 
-                           onClick={() => setConfirmAction({ show: true, type: 'approved', id: selectedWork._id })}
+                           onClick={() => setConfirmAction({ show: true, type: 'approved', id: selectedWork.id })}
                            className="px-6 py-3 rounded-2xl bg-emerald-600 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20"
                          >
                            Approve Post
                          </button>
                          <button 
-                           onClick={() => setRejectingId(selectedWork._id)}
+                           onClick={() => setRejectingId(selectedWork.id)}
                            className="px-6 py-3 rounded-2xl bg-rose-600 text-[10px] font-black uppercase tracking-widest text-white hover:bg-rose-500 transition-all"
                          >
                            Reject

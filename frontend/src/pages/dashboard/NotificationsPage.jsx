@@ -27,7 +27,7 @@ const NotificationsPage = () => {
   const markAsRead = async (id) => {
     try {
       await api.put(`/notifications/${id}/read`);
-      setItems(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+      setItems(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (err) {
       console.error('Failed to mark as read', err);
     }
@@ -90,7 +90,7 @@ const NotificationsPage = () => {
         <AnimatePresence mode="popLayout">
           {items.map((item) => (
             <motion.div 
-              key={item._id}
+              key={item.id}
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -127,7 +127,7 @@ const NotificationsPage = () => {
                        {item.link && (
                          <Link 
                            to={item.link}
-                           onClick={() => !item.isRead && markAsRead(item._id)}
+                           onClick={() => !item.isRead && markAsRead(item.id)}
                            className="text-[9px] font-black uppercase tracking-widest text-brand-600 flex items-center gap-1 hover:underline"
                          >
                             View Details <ExternalLink size={10} />
@@ -139,7 +139,7 @@ const NotificationsPage = () => {
                 
                 {!item.isRead && (
                   <button 
-                    onClick={() => markAsRead(item._id)}
+                    onClick={() => markAsRead(item.id)}
                     className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-[9px] font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-brand-600 dark:bg-brand-600"
                   >
                     <Check size={14} /> Clear

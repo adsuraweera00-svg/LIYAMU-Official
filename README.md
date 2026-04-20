@@ -13,7 +13,7 @@
 
 ### Backend
 - **Runtime**: Node.js + Express
-- **Database**: MongoDB via Mongoose
+- **Database**: Firebase Cloud Firestore
 - **Security**: JWT Authentication, Helmet, HPP, Express Rate Limit
 - **File Handling**: Multer (Local/Cloudinary support)
 
@@ -44,7 +44,8 @@
 1. Navigate to `/backend`
 2. Run `npm install`
 3. Create a `.env` file based on `.env.example`:
-   - `MONGO_URI`: Your MongoDB connection string.
+    - `FIREBASE_SERVICE_ACCOUNT_JSON`: Your Firebase Service Account JSON string.
+    - `FIREBASE_PROJECT_ID`: Your Firebase Project ID.
    - `JWT_SECRET`: A long random string for security.
    - **Production Storage**: To ensure file persistence on hosting services like Render, adding Cloudinary keys is **required**:
      - `CLOUDINARY_CLOUD_NAME`
@@ -64,7 +65,7 @@
 
 | Component | Recommended Service | Note |
 | :--- | :--- | :--- |
-| **Database** | MongoDB Atlas | Use the Free Shared Tier. |
+| **Database** | Firebase Firestore | Native serverless database. |
 | **Backend** | Render.com | Free Web Service (Auto-switches to Cloudinary if keys are present). |
 | **Frontend** | Vercel / Netlify | Connect the `/frontend` directory separately. |
 | **Files** | Cloudinary | Essential for saving PDFs and images in production. |

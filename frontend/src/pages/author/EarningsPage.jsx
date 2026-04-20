@@ -178,7 +178,7 @@ const EarningsPage = () => {
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                   {data.purchases.length > 0 ? data.purchases.map((item) => (
-                    <tr key={item._id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={item.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                        <td className="px-5 py-5 md:px-8 md:py-6 text-[10px] md:text-xs font-bold text-slate-500" data-label="Date">
                           {new Date(item.createdAt).toLocaleDateString()}
                        </td>

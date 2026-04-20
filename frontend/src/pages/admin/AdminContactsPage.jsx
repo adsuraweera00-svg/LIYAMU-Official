@@ -27,7 +27,7 @@ const AdminContactsPage = () => {
   const handleMarkRead = async (id) => {
     try {
       await api.put(`/contacts/${id}/read`);
-      setMessages(messages.map(m => m._id === id ? { ...m, status: 'read' } : m));
+      setMessages(messages.map(m => m.id === id ? { ...m, status: 'read' } : m));
       toast.success('Message marked as read');
     } catch (err) {
       toast.error('Failed to update message');
@@ -38,7 +38,7 @@ const AdminContactsPage = () => {
     const loadingToast = toast.loading('Deleting inquiry...');
     try {
       await api.delete(`/contacts/${id}`);
-      setMessages(prev => prev.filter(m => m._id !== id));
+      setMessages(prev => prev.filter(m => m.id !== id));
       toast.success('Message deleted successfully', { id: loadingToast });
     } catch (err) {
       console.error('Delete error:', err);
@@ -78,7 +78,7 @@ const AdminContactsPage = () => {
           <AnimatePresence>
             {messages.map((msg, i) => (
               <motion.div 
-                key={msg._id}
+                key={msg.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -126,7 +126,7 @@ const AdminContactsPage = () => {
                   <div className="flex lg:flex-col gap-3 justify-end lg:justify-start">
                     {msg.status === 'unread' && (
                       <button 
-                        onClick={() => handleMarkRead(msg._id)}
+                        onClick={() => handleMarkRead(msg.id)}
                         className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                         title="Mark as Read"
                       >
@@ -141,7 +141,7 @@ const AdminContactsPage = () => {
                       <ExternalLink size={20} />
                     </a>
                     <button 
-                      onClick={() => handleDelete(msg._id)}
+                      onClick={() => handleDelete(msg.id)}
                       className="h-12 w-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm"
                       title="Delete Message"
                     >

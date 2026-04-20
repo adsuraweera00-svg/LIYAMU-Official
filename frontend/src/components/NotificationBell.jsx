@@ -3,28 +3,31 @@ import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/firebaseConfig';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const NotificationBell = () => {
   const { auth } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
-  const fetchUnreadCount = async () => {
-    try {
-      const { data } = await api.get('/notifications');
-      setUnreadCount(data.filter(n => !n.isRead).length);
-    } catch (err) {
-      console.error('Failed to fetch notifications');
-    }
-  };
-
   useEffect(() => {
-    if (auth) {
-      fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 15000);
-      return () => clearInterval(interval);
+    if (auth?.id) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('user', '==', auth.id),
+        where('read', '==', false)
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setUnreadCount(snapshot.size);
+      }, (err) => {
+        console.error('Notification subscription error:', err);
+      });
+
+      return () => unsubscribe();
     }
-  }, [auth]);
+  }, [auth?.id]);
 
   if (!auth) return null;
 

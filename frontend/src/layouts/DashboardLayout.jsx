@@ -27,7 +27,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import DashboardHeader from '../components/DashboardHeader';
 import api from '../api/client';
-import { useEffect } from 'react';
+import { db } from '../firebase/firebaseConfig';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const DashboardLayout = () => {
   const { auth, logout } = useAuth();
@@ -37,28 +38,43 @@ const DashboardLayout = () => {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   useEffect(() => {
-    const fetchAlerts = async () => {
-      if (!auth) return;
-      try {
-        const { data: notifications } = await api.get('/notifications');
-        setHasUnreadAlerts(Array.isArray(notifications) && notifications.some(n => !n.isRead));
+    if (!auth?.id) return;
 
-        if (auth.role === 'admin') {
-          const { data: payouts } = await api.get('/withdrawals/admin');
-          setHasPendingPayouts(Array.isArray(payouts) && payouts.some(p => p.status === 'pending'));
-          
-          const { data: contacts } = await api.get('/contacts');
-          setHasUnreadMessages(Array.isArray(contacts) && contacts.some(c => c.status === 'unread'));
-        }
-      } catch (err) {
-        console.error("Failed to fetch alerts", err);
-      }
-    };
-    
-    fetchAlerts();
-    const interval = setInterval(fetchAlerts, 30000); // Check every 30 seconds for optimal performance
-    return () => clearInterval(interval);
-  }, [auth]);
+    const unsubscribes = [];
+
+    // Notification Listener
+    const qNotif = query(
+      collection(db, 'notifications'),
+      where('user', '==', auth.id),
+      where('read', '==', false)
+    );
+    unsubscribes.push(onSnapshot(qNotif, (snap) => {
+      setHasUnreadAlerts(!snap.empty);
+    }));
+
+    // Admin Listeners
+    if (auth.role === 'admin') {
+      // Payouts
+      const qPayouts = query(
+        collection(db, 'withdrawals'),
+        where('status', '==', 'pending')
+      );
+      unsubscribes.push(onSnapshot(qPayouts, (snap) => {
+        setHasPendingPayouts(!snap.empty);
+      }));
+
+      // Contact Messages
+      const qContacts = query(
+        collection(db, 'contacts'),
+        where('status', '==', 'unread')
+      );
+      unsubscribes.push(onSnapshot(qContacts, (snap) => {
+        setHasUnreadMessages(!snap.empty);
+      }));
+    }
+
+    return () => unsubscribes.forEach(unsub => unsub());
+  }, [auth?.id, auth?.role]);
   
   const common = [
     { to: '/dashboard', label: 'Overview', icon: LayoutDashboard },

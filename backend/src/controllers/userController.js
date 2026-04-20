@@ -1,261 +1,256 @@
-import mongoose from 'mongoose';
-import User from '../models/User.js';
-import Book from '../models/Book.js';
-import VerificationRequest from '../models/VerificationRequest.js';
-import Notification from '../models/Notification.js';
-import CreativeWork from '../models/CreativeWork.js';
+import { adminFirestore, FieldValue } from '../config/firebase.js';
+import { ApiError } from '../utils/apiError.js';
+import bcrypt from 'bcryptjs';
+
+const db = adminFirestore();
 
 export const updateProfile = async (req, res) => {
   const { name, email, phone, bio, theme } = req.body;
   let { socialLinks } = req.body;
 
-  // If socialLinks is a string (due to FormData), parse it
   if (typeof socialLinks === 'string') {
-    try {
-      socialLinks = JSON.parse(socialLinks);
-    } catch (e) {
-      console.error('Failed to parse socialLinks:', e);
-      socialLinks = null;
-    }
+    try { socialLinks = JSON.parse(socialLinks); } catch (e) { socialLinks = null; }
   }
   
+  const userRef = db.collection('users').doc(req.user.id);
+  const updates = {};
+
   if (email && email !== req.user.email) {
-    // Prevent changing the owner email
     if (req.user.email === 'liyamu.owner@gmail.com') {
       return res.status(403).json({ message: 'Owner email cannot be changed' });
     }
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ message: 'Email already in use' });
-    }
-    req.user.email = email;
+    const existing = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
+    if (!existing.empty) return res.status(400).json({ message: 'Email already in use' });
+    updates.email = email.toLowerCase();
   }
 
-  if (name !== undefined) req.user.name = name;
-  if (phone !== undefined) req.user.phone = phone;
-  if (bio !== undefined) req.user.bio = bio;
+  if (name !== undefined) updates.name = name;
+  if (phone !== undefined) updates.phone = phone;
+  if (bio !== undefined) updates.bio = bio;
   
-  // Handle file upload for profile picture
   if (req.file) {
-    req.user.profilePicture = req.file.path.startsWith('http') 
+    updates.profilePicture = req.file.path.startsWith('http') 
       ? req.file.path 
       : `/uploads/${req.file.filename}`;
   }
   
-  if (theme) req.user.settings.theme = theme;
+  if (theme) updates['settings.theme'] = theme;
   
   if (socialLinks) {
-    req.user.socialLinks = {
-      facebook: socialLinks.facebook !== undefined ? socialLinks.facebook : req.user.socialLinks.facebook,
-      whatsapp: socialLinks.whatsapp !== undefined ? socialLinks.whatsapp : req.user.socialLinks.whatsapp,
-      telegram: socialLinks.telegram !== undefined ? socialLinks.telegram : req.user.socialLinks.telegram,
+    updates.socialLinks = {
+      facebook: socialLinks.facebook !== undefined ? socialLinks.facebook : (req.user.socialLinks?.facebook || ''),
+      whatsapp: socialLinks.whatsapp !== undefined ? socialLinks.whatsapp : (req.user.socialLinks?.whatsapp || ''),
+      telegram: socialLinks.telegram !== undefined ? socialLinks.telegram : (req.user.socialLinks?.telegram || ''),
     };
-    req.user.markModified('socialLinks');
   }
 
-  await req.user.save();
-  res.json(req.user);
+  updates.updatedAt = new Date().toISOString();
+  await userRef.update(updates);
+  
+  const updatedDoc = await userRef.get();
+  res.json({ id: updatedDoc.id, ...updatedDoc.data() });
 };
 
-
 export const getAuthors = async (req, res) => {
-  const authors = await User.find({ 
-    role: { $in: ['author', 'verified_author', 'pro_writer'] }, 
-    isBanned: false 
-  }).select('-password');
-  const books = await Book.aggregate([{ $group: { _id: '$author', count: { $sum: 1 } } }]);
-  const map = new Map(books.map((b) => [String(b._id), b.count]));
-  res.json(
-    authors.map((a) => ({
-      ...a.toObject(),
-      bookCount: map.get(String(a._id)) || 0,
-    }))
-  );
+  const snapshot = await db.collection('users')
+    .where('role', 'in', ['author', 'verified_author', 'pro_writer'])
+    .where('isBanned', '==', false)
+    .get();
+
+  const authors = snapshot.docs.map(doc => {
+    const data = doc.data();
+    delete data.password;
+    return { id: doc.id, ...data };
+  });
+
+  // Fetch book counts (simplification: fetch all approved books and count in memory or do per author)
+  const booksSnapshot = await db.collection('books').where('status', '==', 'approved').get();
+  const bookCounts = {};
+  booksSnapshot.forEach(doc => {
+    const authorId = doc.data().author;
+    bookCounts[authorId] = (bookCounts[authorId] || 0) + 1;
+  });
+
+  res.json(authors.map(a => ({ ...a, bookCount: bookCounts[a.id] || 0 })));
 };
 
 export const toggleWishlist = async (req, res) => {
   const { bookId } = req.params;
+  const userRef = db.collection('users').doc(req.user.id);
   
-  if (!req.user.wishlist) req.user.wishlist = [];
+  const hasBook = (req.user.wishlist || []).some(id => String(id) === String(bookId));
   
-  const hasBook = req.user.wishlist.some((id) => String(id) === String(bookId));
-  req.user.wishlist = hasBook
-    ? req.user.wishlist.filter((id) => String(id) !== String(bookId))
-    : [...req.user.wishlist, bookId];
-  await req.user.save();
-  res.json({ wishlist: req.user.wishlist });
+  await userRef.update({
+    wishlist: hasBook ? FieldValue.arrayRemove(bookId) : FieldValue.arrayUnion(bookId)
+  });
+
+  const updated = await userRef.get();
+  res.json({ wishlist: updated.data().wishlist || [] });
 };
 
 export const toggleFollow = async (req, res) => {
-  try {
-    const { authorId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(authorId)) return res.status(400).json({ message: 'Invalid Author ID' });
+  const { authorId } = req.params;
+  const userRef = db.collection('users').doc(req.user.id);
+  const authorRef = db.collection('users').doc(authorId);
+  
+  const authorDoc = await authorRef.get();
+  if (!authorDoc.exists) throw new ApiError(404, 'Author not found');
 
-    const author = await User.findById(authorId);
-    if (!author) return res.status(404).json({ message: 'Author not found' });
+  const isFollowing = (req.user.following || []).some(id => String(id) === String(authorId));
 
-    if (!req.user.following) req.user.following = [];
-    const isFollowing = req.user.following.some(id => String(id) === String(authorId));
-
+  await db.runTransaction(async (t) => {
     if (isFollowing) {
-      req.user.following = req.user.following.filter(id => String(id) !== String(authorId));
-      author.followersCount = Math.max(0, (author.followersCount || 0) - 1);
+      t.update(userRef, { following: FieldValue.arrayRemove(authorId) });
+      t.update(authorRef, { followersCount: FieldValue.increment(-1) });
     } else {
-      req.user.following.push(new mongoose.Types.ObjectId(authorId));
-      author.followersCount = (author.followersCount || 0) + 1;
-      await Notification.create({
+      t.update(userRef, { following: FieldValue.arrayUnion(authorId) });
+      t.update(authorRef, { followersCount: FieldValue.increment(1) });
+      
+      const notifRef = db.collection('notifications').doc();
+      t.set(notifRef, {
         user: authorId,
         title: 'New Follower!',
         message: `${req.user.name} started following you.`,
-        type: 'user'
+        type: 'user',
+        createdAt: new Date().toISOString(),
+        read: false
       });
     }
+  });
 
-    await req.user.save();
-    await author.save();
-    res.json({ following: req.user.following, followersCount: author.followersCount });
-  } catch (err) {
-    console.error('Toggle Follow Error:', err);
-    res.status(500).json({ message: 'Internal Server Error', error: err.message });
-  }
+  const updatedUser = await userRef.get();
+  const updatedAuthor = await authorRef.get();
+  res.json({ 
+    following: updatedUser.data().following || [], 
+    followersCount: updatedAuthor.data().followersCount || 0 
+  });
 };
 
 export const getFollowedAuthors = async (req, res) => {
-  const user = await User.findById(req.user._id).populate('following', 'name profilePicture role followersCount bio');
-  res.json(user.following);
+  if (!req.user.following || req.user.following.length === 0) return res.json([]);
+  
+  const snapshot = await db.collection('users').where('__name__', 'in', req.user.following).get();
+  res.json(snapshot.docs.map(doc => {
+    const data = doc.data();
+    return { id: doc.id, name: data.name, profilePicture: data.profilePicture, role: data.role, followersCount: data.followersCount, bio: data.bio };
+  }));
 };
 
 export const updateReadingProgress = async (req, res) => {
-  try {
-    const { bookId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(bookId)) return res.status(400).json({ message: 'Invalid Book ID' });
+  const { bookId } = req.params;
+  const userRef = db.collection('users').doc(req.user.id);
 
-    const bId = new mongoose.Types.ObjectId(bookId);
-    req.user.lastReadBook = bId;
-    
-    if (!req.user.readingHistory) req.user.readingHistory = [];
-    if (!req.user.readingHistory.some(id => String(id) === String(bookId))) {
-      req.user.readingHistory.push(bId);
-    }
-    
-    await req.user.save();
-    res.json({ lastReadBook: req.user.lastReadBook });
-  } catch (err) {
-    console.error('Update Reading Progress Error:', err);
-    res.status(500).json({ message: 'Internal Server Error', error: err.message });
-  }
+  await userRef.update({
+    lastReadBook: bookId,
+    readingHistory: FieldValue.arrayUnion(bookId)
+  });
+
+  res.json({ lastReadBook: bookId });
 };
 
 export const toggleBookmark = async (req, res) => {
   const { workId } = req.params;
-  
-  if (!mongoose.Types.ObjectId.isValid(workId)) return res.status(400).json({ message: 'Invalid Work ID' });
+  const userRef = db.collection('users').doc(req.user.id);
 
-  if (!req.user.bookmarkedWorks) req.user.bookmarkedWorks = [];
-  
-  const hasBookmarked = req.user.bookmarkedWorks.some((id) => String(id) === String(workId));
-  req.user.bookmarkedWorks = hasBookmarked
-    ? req.user.bookmarkedWorks.filter((id) => String(id) !== String(workId))
-    : [...req.user.bookmarkedWorks, workId];
-    
-  await req.user.save();
-  res.json({ bookmarkedWorks: req.user.bookmarkedWorks });
+  const hasBookmarked = (req.user.bookmarkedWorks || []).some(id => String(id) === String(workId));
+
+  await userRef.update({
+    bookmarkedWorks: hasBookmarked ? FieldValue.arrayRemove(workId) : FieldValue.arrayUnion(workId)
+  });
+
+  const updated = await userRef.get();
+  res.json({ bookmarkedWorks: updated.data().bookmarkedWorks || [] });
 };
 
 export const getBookmarkedWorks = async (req, res) => {
-  const user = await User.findById(req.user._id).populate({
-    path: 'bookmarkedWorks',
-    populate: { path: 'author', select: 'name profilePicture' }
-  });
-  res.json(user.bookmarkedWorks || []);
+  if (!req.user.bookmarkedWorks || req.user.bookmarkedWorks.length === 0) return res.json([]);
+  
+  const snapshot = await db.collection('creativeWorks').where('__name__', 'in', req.user.bookmarkedWorks).get();
+  const works = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const authorIds = [...new Set(works.map(w => w.author))];
+  const authors = {};
+  
+  if (authorIds.length > 0) {
+    const userSnap = await db.collection('users').where('__name__', 'in', authorIds).get();
+    userSnap.forEach(d => authors[d.id] = d.data());
+  }
+
+  res.json(works.map(w => {
+    const a = authors[w.author];
+    return { ...w, author: { id: w.author, name: a?.name, profilePicture: a?.profilePicture } };
+  }));
 };
 
 export const deleteMyAccount = async (req, res) => {
-  const user = await User.findById(req.user._id);
-  if (!user) throw new Error('User not found');
+  if (req.user.email === 'liyamu.owner@gmail.com') throw new ApiError(403, 'Owner account cannot be deleted');
 
-  // Protect Owner Account
-  if (user.email === 'liyamu.owner@gmail.com') {
-    return res.status(403).json({ message: 'Owner account cannot be deleted' });
-  }
+  const userRef = db.collection('users').doc(req.user.id);
+  const originalName = req.user.name;
 
-  // Hard-delete? No, soft-delete per implementation plan for audit/restoration potential.
-  user.isDeleted = true;
-  user.deletedAt = new Date();
-  
-  const originalName = user.name;
-  user.name = `[DELETED USER ${user._id.toString().slice(-4)}]`;
-  user.email = `deleted_${Date.now()}_${user._id}@liyamu.com`;
-  user.password = 'N/A'; // De-authenticate
-  
-  await user.save({ validateBeforeSave: false });
+  await userRef.update({
+    isDeleted: true,
+    deletedAt: new Date().toISOString(),
+    name: `[DELETED USER ${req.user.id.slice(-4)}]`,
+    email: `deleted_${Date.now()}_${req.user.id}@liyamu.com`,
+    password: 'N/A'
+  });
 
-  // Create a notification for audit/final record
-  await Notification.create({
-    user: user._id,
+  await db.collection('notifications').add({
+    user: req.user.id,
     title: 'Account Deleted',
-    message: `Hello ${originalName}, your account has been successfully deleted as per your request. If this was a mistake, please contact support within 30 days.`,
-    type: 'user'
+    message: `Hello ${originalName}, your account has been successfully deleted.`,
+    type: 'user',
+    createdAt: new Date().toISOString(),
+    read: false
   });
 
   res.json({ success: true, message: 'Account deleted successfully' });
 };
 
 export const getAuthorProfile = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid ID' });
+  const { id } = req.params;
+  const authorDoc = await db.collection('users').doc(id).get();
+  if (!authorDoc.exists) throw new ApiError(404, 'Author not found');
 
-    const author = await User.findById(id).select('-password').lean();
-    if (!author) return res.status(404).json({ message: 'Author not found' });
+  const authorData = authorDoc.data();
+  delete authorData.password;
 
-    // Fetch author's books
-    const books = await Book.find({ author: id, status: 'approved' }).sort({ createdAt: -1 });
-    
-    // Fetch author's creative works
-    const creativeWorks = await CreativeWork.find({ author: id, status: 'approved' }).sort({ createdAt: -1 }).limit(10);
+  const booksSnapshot = await db.collection('books')
+    .where('author', '==', id)
+    .where('status', '==', 'approved')
+    .orderBy('createdAt', 'desc')
+    .get();
+  
+  const creativeWorksSnapshot = await db.collection('creativeWorks')
+    .where('author', '==', id)
+    .where('status', '==', 'approved')
+    .orderBy('createdAt', 'desc')
+    .limit(10)
+    .get();
 
-    res.json({
-      ...author,
-      books,
-      creativeWorks
-    });
-  } catch (err) {
-    console.error('Get Author Profile Error:', err);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
+  res.json({
+    id: authorDoc.id,
+    ...authorData,
+    books: booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+    creativeWorks: creativeWorksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  });
 };
+
 export const updatePassword = async (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    return res.status(400).json({ message: 'All fields are required' });
-  }
+  if (!currentPassword || !newPassword || !confirmPassword) throw new ApiError(400, 'All fields are required');
+  if (newPassword !== confirmPassword) throw new ApiError(400, 'Passwords do not match');
+  if (newPassword.length < 6) throw new ApiError(400, 'Minimum 6 characters');
 
-  if (newPassword !== confirmPassword) {
-    return res.status(400).json({ message: 'New passwords do not match' });
-  }
+  if (req.user.socialProvider !== 'local') throw new ApiError(400, 'Social accounts cannot change password');
 
-  if (newPassword.length < 6) {
-    return res.status(400).json({ message: 'New password must be at least 6 characters' });
-  }
+  const isMatch = await bcrypt.compare(currentPassword, req.user.password);
+  if (!isMatch) throw new ApiError(401, 'Incorrect current password');
 
-  const user = await User.findById(req.user._id);
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
-  }
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-  if (user.socialProvider !== 'local') {
-    return res.status(400).json({ message: 'Social accounts cannot change password here' });
-  }
-
-  const isMatch = await user.matchPassword(currentPassword);
-  if (!isMatch) {
-    return res.status(401).json({ message: 'Incorrect current password' });
-  }
-
-  user.password = newPassword;
-  await user.save();
-
+  await db.collection('users').doc(req.user.id).update({ password: hashedPassword });
   res.json({ message: 'Password updated successfully' });
 };

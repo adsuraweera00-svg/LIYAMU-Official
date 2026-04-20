@@ -102,7 +102,7 @@ const OverviewPage = () => {
                      </p>
                      
                      <Link 
-                       to={`/dashboard/library/${lastBook._id}`}
+                       to={`/dashboard/library/${lastBook.id}`}
                        className="inline-flex items-center gap-3 rounded-2xl bg-white px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-900 hover:bg-brand-500 hover:text-white transition-all shadow-xl shadow-white/5 active:scale-95"
                      >
                         Resume Reading

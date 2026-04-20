@@ -1,74 +1,98 @@
-import ChatMessage from '../models/ChatMessage.js';
-import User from '../models/User.js';
-import Notification from '../models/Notification.js';
+import { adminFirestore } from '../config/firebase.js';
 import { ApiError } from '../utils/apiError.js';
+
+const db = adminFirestore();
 
 export const sendMessage = async (req, res) => {
   const { message, recipientId } = req.body;
   if (!message) throw new ApiError(400, 'Message is required');
 
-  let chat;
-  if (req.user.role === 'admin') {
-    if (!recipientId) throw new ApiError(400, 'Recipient ID is required for admins');
-    chat = await ChatMessage.create({
-      user: recipientId,
-      admin: req.user._id,
-      sender: 'admin',
-      message
-    });
+  const chatData = {
+    message,
+    createdAt: new Date().toISOString(),
+    isRead: false
+  };
 
-    await Notification.create({
+  if (req.user.role === 'admin') {
+    if (!recipientId) throw new ApiError(400, 'Recipient ID required');
+    chatData.user = recipientId;
+    chatData.admin = req.user.id;
+    chatData.sender = 'admin';
+
+    await db.collection('notifications').add({
       user: recipientId,
       title: 'New message from Admin',
-      message: 'An administrator has responded to your inquiry.',
-      type: 'user'
+      message: 'Support response received.',
+      type: 'user',
+      createdAt: new Date().toISOString(),
+      read: false
     });
   } else {
-    chat = await ChatMessage.create({
-      user: req.user._id,
-      sender: 'user',
-      message
-    });
+    chatData.user = req.user.id;
+    chatData.sender = 'user';
 
-    // Optionally notify all admins
-    const admins = await User.find({ role: 'admin' });
-    await Promise.all(admins.map(admin => 
-      Notification.create({
-        user: admin._id,
+    const adminsSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+    const batch = db.batch();
+    adminsSnapshot.forEach(doc => {
+      const notifRef = db.collection('notifications').doc();
+      batch.set(notifRef, {
+        user: doc.id,
         title: 'New Support Message',
-        message: `User ${req.user.name} sent a new message.`,
-        type: 'user'
-      })
-    ));
+        message: `Message from ${req.user.name}.`,
+        type: 'user',
+        createdAt: new Date().toISOString(),
+        read: false
+      });
+    });
+    await batch.commit();
   }
 
-  res.status(201).json(chat);
+  const docRef = await db.collection('chatMessages').add(chatData);
+  res.status(201).json({ id: docRef.id, ...chatData });
 };
 
 export const getMyChatHistory = async (req, res) => {
-  const messages = await ChatMessage.find({ user: req.user._id }).sort({ createdAt: 1 });
-  res.json(messages);
+  const snapshot = await db.collection('chatMessages')
+    .where('user', '==', req.user.id)
+    .orderBy('createdAt', 'asc')
+    .get();
+  res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 };
 
 export const getAdminChats = async (req, res) => {
   const { userId } = req.params;
   if (!userId) {
-    // Get all unique users who have sent messages
-    const distinctUsers = await ChatMessage.distinct('user');
-    const userDetails = await User.find({ _id: { $in: distinctUsers } }).select('name email role');
-    return res.json(userDetails);
+    // Unique users simulation
+    const snapshot = await db.collection('chatMessages').get();
+    const uniqueUserIds = [...new Set(snapshot.docs.map(doc => doc.data().user))];
+    
+    if (uniqueUserIds.length === 0) return res.json([]);
+    
+    const userSnapshot = await db.collection('users').where('__name__', 'in', uniqueUserIds).get();
+    return res.json(userSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, email: doc.data().email, role: doc.data().role })));
   }
 
-  const messages = await ChatMessage.find({ user: userId }).sort({ createdAt: 1 });
-  res.json(messages);
+  const snapshot = await db.collection('chatMessages')
+    .where('user', '==', userId)
+    .orderBy('createdAt', 'asc')
+    .get();
+  res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 };
 
 export const markAsRead = async (req, res) => {
-  const { userId } = req.params; // If admin, mark all messages from this user as read
-  const query = req.user.role === 'admin' 
-    ? { user: userId, sender: 'user', isRead: false }
-    : { user: req.user._id, sender: 'admin', isRead: false };
+  const { userId } = req.params;
+  let query = db.collection('chatMessages').where('isRead', '==', false);
+  
+  if (req.user.role === 'admin') {
+    query = query.where('user', '==', userId).where('sender', '==', 'user');
+  } else {
+    query = query.where('user', '==', req.user.id).where('sender', '==', 'admin');
+  }
 
-  await ChatMessage.updateMany(query, { isRead: true });
+  const snapshot = await query.get();
+  const batch = db.batch();
+  snapshot.docs.forEach(doc => batch.update(doc.ref, { isRead: true }));
+  await batch.commit();
+  
   res.json({ success: true });
 };

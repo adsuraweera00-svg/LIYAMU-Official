@@ -1,18 +1,23 @@
-import ContactMessage from '../models/ContactMessage.js';
+import { adminFirestore } from '../config/firebase.js';
 import { notifyAdmins } from '../utils/notificationHelper.js';
-import User from '../models/User.js';
-import Notification from '../models/Notification.js';
+import { ApiError } from '../utils/apiError.js';
+
+const db = adminFirestore();
 
 export const createContactMessage = async (req, res) => {
   const { name, email, message } = req.body;
-  
-  if (!name || !email || !message) {
-    return res.status(400).json({ message: 'All fields are required' });
-  }
+  if (!name || !email || !message) throw new ApiError(400, 'All fields are required');
 
-  const newMessage = await ContactMessage.create({ name, email, message });
+  const messageData = {
+    name,
+    email,
+    message,
+    status: 'unread',
+    createdAt: new Date().toISOString()
+  };
 
-  // Create notifications for all admins (triggers global Telegram hook)
+  const docRef = await db.collection('contactMessages').add(messageData);
+
   await notifyAdmins({
     title: 'New Public Inquiry',
     message: `You have received a new message from ${name} (${email}).`,
@@ -25,26 +30,28 @@ export const createContactMessage = async (req, res) => {
     }
   });
 
-  res.status(201).json(newMessage);
+  res.status(201).json({ id: docRef.id, ...messageData });
 };
 
 export const getContactMessages = async (req, res) => {
-  const messages = await ContactMessage.find().sort({ createdAt: -1 });
-  res.json(messages);
+  const snapshot = await db.collection('contactMessages').orderBy('createdAt', 'desc').get();
+  res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 };
 
 export const markAsRead = async (req, res) => {
-  const message = await ContactMessage.findByIdAndUpdate(
-    req.params.id,
-    { status: 'read' },
-    { new: true }
-  );
-  if (!message) return res.status(404).json({ message: 'Message not found' });
-  res.json(message);
+  const ref = db.collection('contactMessages').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Message not found');
+
+  await ref.update({ status: 'read' });
+  res.json({ id: doc.id, ...doc.data(), status: 'read' });
 };
 
 export const deleteContactMessage = async (req, res) => {
-  const message = await ContactMessage.findByIdAndDelete(req.params.id);
-  if (!message) return res.status(404).json({ message: 'Message not found' });
+  const ref = db.collection('contactMessages').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Message not found');
+
+  await ref.delete();
   res.json({ message: 'Message deleted successfully' });
 };

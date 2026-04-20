@@ -1,251 +1,301 @@
-import User from '../models/User.js';
-import Book from '../models/Book.js';
-import Purchase from '../models/Purchase.js';
-import Notification from '../models/Notification.js';
-import Review from '../models/Review.js';
-import CreativeWork from '../models/CreativeWork.js';
+import { adminFirestore } from '../config/firebase.js';
 import { ApiError } from '../utils/apiError.js';
+import bcrypt from 'bcryptjs';
+
+const db = adminFirestore();
 
 export const getAdminOverview = async (req, res) => {
-  const [users, authors, pendingBooks, purchases] = await Promise.all([
-    User.countDocuments({ role: { $in: ['beginner_reader', 'pro_reader'] } }),
-    User.countDocuments({ role: { $in: ['author', 'verified_author', 'pro_writer'] } }),
-    Book.countDocuments({ status: 'pending' }),
-    Purchase.find().populate('book', 'title price').sort({ createdAt: -1 }),
+  const [userSnap, authorSnap, pendingBookSnap, purchaseSnap] = await Promise.all([
+    db.collection('users').where('role', 'in', ['beginner_reader', 'pro_reader', 'reader']).get(),
+    db.collection('users').where('role', 'in', ['author', 'verified_author', 'pro_writer']).get(),
+    db.collection('books').where('status', '==', 'pending').get(),
+    db.collection('purchases').orderBy('createdAt', 'desc').get()
   ]);
-  res.json({ users, authors, pendingBooks, purchases });
+
+  res.json({
+    users: userSnap.size,
+    authors: authorSnap.size,
+    pendingBooks: pendingBookSnap.size,
+    purchases: purchaseSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  });
 };
 
 export const getAllUsers = async (req, res) => {
-  const users = await User.find({ isDeleted: { $ne: true } }).select('-password').sort({ createdAt: -1 });
-  res.json(users);
+  const snapshot = await db.collection('users')
+    .where('isDeleted', '==', false)
+    .orderBy('createdAt', 'desc')
+    .get();
+  res.json(snapshot.docs.map(doc => {
+    const data = doc.data();
+    delete data.password;
+    return { id: doc.id, ...data };
+  }));
 };
 
 export const updateUser = async (req, res) => {
-  const user = await User.findById(req.params.id);
-  if (!user) throw new ApiError(404, 'User not found');
-
+  const { id } = req.params;
   const { isBanned, role, badges } = req.body;
-  const oldRole = user.role;
 
-  // PROTECTION: Prevent modifying the owner account
-  const isOwner = user.email === 'liyamu.owner@gmail.com' || user.badges?.owner;
+  const userRef = db.collection('users').doc(id);
+  const userDoc = await userRef.get();
+  if (!userDoc.exists) throw new ApiError(404, 'User not found');
+  const userData = userDoc.data();
+
+  const isOwner = userData.email === 'liyamu.owner@gmail.com' || userData.badges?.owner;
   if (isOwner) {
-    if (typeof isBanned === 'boolean' && isBanned !== user.isBanned) {
-      throw new ApiError(403, 'The Owner account cannot be suspended or banned.');
-    }
-    if (role && role !== user.role) {
-      throw new ApiError(403, 'The Owner account role cannot be changed.');
-    }
+    if (typeof isBanned === 'boolean' && isBanned !== userData.isBanned) throw new ApiError(403, 'Owner cannot be banned.');
+    if (role && role !== userData.role) throw new ApiError(403, 'Owner role cannot be changed.');
   }
 
-  if (typeof isBanned === 'boolean') user.isBanned = isBanned;
+  const updates = {};
+  if (typeof isBanned === 'boolean') updates.isBanned = isBanned;
   
-  const validRoles = ['reader', 'beginner_reader', 'pro_reader', 'author', 'verified_author', 'pro_writer', 'admin'];
-  if (role && validRoles.includes(role)) {
-    // Prevent self-demotion from admin
-    if (req.user._id.toString() === user._id.toString() && role !== 'admin') {
-      throw new ApiError(400, 'You cannot remove your own admin role');
-    }
-    user.role = role;
+  if (role) {
+    if (req.user.id === id && role !== 'admin') throw new ApiError(400, 'Cannot remove own admin role');
+    updates.role = role;
   }
 
-  if (badges) user.badges = { ...user.badges, ...badges };
-  await user.save();
+  if (badges) {
+    for (const [k, v] of Object.entries(badges)) updates[`badges.${k}`] = v;
+  }
 
-  // Notify user if role has changed
-  if (role && role !== oldRole) {
-    await Notification.create({
-      user: user._id,
-      title: 'Member Rank Updated',
-      message: `Your account role has been updated to ${role.replace('_', ' ')}. Your access permissions have changed accordingly.`,
-      type: 'user'
+  await userRef.update(updates);
+
+  if (role && role !== userData.role) {
+    await db.collection('notifications').add({
+      user: id,
+      title: 'Rank Updated',
+      message: `Your role was updated to ${role}.`,
+      type: 'user',
+      createdAt: new Date().toISOString(),
+      read: false
     });
   }
 
-  res.json(user);
+  const updated = await userRef.get();
+  res.json({ id: updated.id, ...updated.data() });
 };
 
 export const getBookSubmissions = async (req, res) => {
-  const books = await Book.find().populate('author', 'name email').sort({ createdAt: -1 });
-  res.json(books);
+  const snapshot = await db.collection('books').orderBy('createdAt', 'desc').get();
+  const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  const userIds = [...new Set(books.map(b => b.author))];
+  const users = {};
+  if (userIds.length > 0) {
+    const userSnap = await db.collection('users').where('__name__', 'in', userIds).get();
+    userSnap.forEach(d => users[d.id] = d.data());
+  }
+
+  res.json(books.map(b => ({ ...b, author: { id: b.author, name: users[b.author]?.name, email: users[b.author]?.email } })));
 };
 
 export const reviewBookSubmission = async (req, res) => {
   const { status, rejectionReason } = req.body;
-  const book = await Book.findById(req.params.id);
-  if (!book) throw new ApiError(404, 'Book not found');
-  book.status = status;
-  if (rejectionReason) book.rejectionReason = rejectionReason;
-  await book.save();
+  const ref = db.collection('books').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Book not found');
 
-  await Notification.create({
-    user: book.author,
+  const updates = { status, updatedAt: new Date().toISOString() };
+  if (rejectionReason) updates.rejectionReason = rejectionReason;
+  await ref.update(updates);
+
+  await db.collection('notifications').add({
+    user: doc.data().author,
     title: `Book ${status}`,
-    message: status === 'approved' ? `${book.title} is now public.` : `${book.title} was rejected: ${rejectionReason}`,
+    message: status === 'approved' ? `${doc.data().title} is live.` : `${doc.data().title} rejected: ${rejectionReason}`,
     type: 'book',
+    createdAt: new Date().toISOString(),
+    read: false
   });
 
-  res.json(book);
+  res.json({ id: doc.id, ...doc.data(), ...updates });
 };
 
 export const deleteBook = async (req, res) => {
-  const book = await Book.findById(req.params.id);
-  if (!book) throw new ApiError(404, 'Book not found');
+  const ref = db.collection('books').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Book not found');
 
-  // Cascade delete associated reviews and purchases
-  await Promise.all([
-    Review.deleteMany({ book: book._id }),
-    Purchase.deleteMany({ book: book._id })
-  ]);
+  // Cascade
+  const batch = db.batch();
+  const reviews = await db.collection('reviews').where('book', '==', req.params.id).get();
+  reviews.forEach(d => batch.delete(d.ref));
+  
+  const purchases = await db.collection('purchases').where('book', '==', req.params.id).get();
+  purchases.forEach(d => batch.delete(d.ref));
 
-  if (book.author) {
-    await Notification.create({
-      user: book.author,
+  batch.delete(ref);
+  await batch.commit();
+
+  if (doc.data().author) {
+    await db.collection('notifications').add({
+      user: doc.data().author,
       title: 'Book Removed',
-      message: `Your book "${book.title}" was permanently removed from the platform by administration.`,
+      message: `Your book "${doc.data().title}" was removed by admin.`,
       type: 'book',
+      createdAt: new Date().toISOString(),
+      read: false
     });
   }
 
-  await book.deleteOne();
-  res.json({ success: true, message: 'Book and associated data permanently removed.' });
-};
-
-export const toggleBookVisibility = async (req, res) => {
-  const book = await Book.findById(req.params.id);
-  if (!book) throw new ApiError(404, 'Book not found');
-
-  book.isHidden = !book.isHidden;
-  await book.save();
-
-  res.json(book);
-};
-
-// Enhanced Reviews: Latest 20 or Filter by Book
-export const getAllUserReviews = async (req, res) => {
-  const { bookId } = req.query;
-  const query = {};
-  if (bookId) query.book = bookId;
-
-  const reviews = await Review.find(query)
-    .populate('book', 'title coverUrl')
-    .populate('user', 'name email avatar')
-    .sort({ createdAt: -1 })
-    .limit(bookId ? 1000 : 20); // Show all for specific book, 20 for latest
-  res.json(reviews);
-};
-
-export const deleteUserReview = async (req, res) => {
-  const review = await Review.findById(req.params.id);
-  if (!review) throw new ApiError(404, 'Review not found');
-  
-  const book = await Book.findById(review.book);
-  if (book) {
-    const reviews = await Review.find({ book: book._id, _id: { $ne: review._id } });
-    if (reviews.length > 0) {
-      book.ratingAverage = reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
-      book.ratingCount = reviews.length;
-    } else {
-      book.ratingAverage = 0;
-      book.ratingCount = 0;
-    }
-    await book.save();
-  }
-
-  await review.deleteOne();
   res.json({ success: true });
 };
 
-// Creative Corner Review logic
+export const toggleBookVisibility = async (req, res) => {
+  const ref = db.collection('books').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Book not found');
+
+  const newHidden = !doc.data().isHidden;
+  await ref.update({ isHidden: newHidden });
+  res.json({ id: doc.id, ...doc.data(), isHidden: newHidden });
+};
+
+export const getAllUserReviews = async (req, res) => {
+  const { bookId } = req.query;
+  let query = db.collection('reviews');
+  if (bookId) query = query.where('book', '==', bookId);
+
+  const snapshot = await query.orderBy('createdAt', 'desc').limit(bookId ? 1000 : 20).get();
+  const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  const bookIds = [...new Set(reviews.map(r => r.book))];
+  const userIds = [...new Set(reviews.map(r => r.user))];
+
+  const [books, users] = await Promise.all([
+    bookIds.length > 0 ? db.collection('books').where('__name__', 'in', bookIds).get() : { forEach: () => {} },
+    userIds.length > 0 ? db.collection('users').where('__name__', 'in', userIds).get() : { forEach: () => {} }
+  ]);
+
+  const bookMap = {}, userMap = {};
+  books.forEach(d => bookMap[d.id] = d.data());
+  users.forEach(d => userMap[d.id] = d.data());
+
+  res.json(reviews.map(r => ({
+    ...r,
+    book: { id: r.book, title: bookMap[r.book]?.title, coverUrl: bookMap[r.book]?.coverUrl },
+    user: { id: r.user, name: userMap[r.user]?.name, profilePicture: userMap[r.user]?.profilePicture }
+  })));
+};
+
+export const deleteUserReview = async (req, res) => {
+  const ref = db.collection('reviews').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Review not found');
+  
+  const bookId = doc.data().book;
+  await ref.delete();
+
+  // Recalculate book stats
+  const remainingSnapshot = await db.collection('reviews').where('book', '==', bookId).get();
+  const reviews = remainingSnapshot.docs.map(d => d.data());
+  const avg = reviews.length ? reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length : 0;
+  
+  await db.collection('books').doc(bookId).update({ ratingAverage: avg, ratingCount: reviews.length });
+
+  res.json({ success: true });
+};
+
 export const getAdminCreativeWorks = async (req, res) => {
-  const works = await CreativeWork.find()
-    .populate('author', 'name profilePicture email')
-    .sort({ createdAt: -1 });
-  res.json(works);
+  const snapshot = await db.collection('creativeWorks').orderBy('createdAt', 'desc').get();
+  const works = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  const userIds = [...new Set(works.map(w => w.author))];
+  const users = {};
+  if (userIds.length > 0) {
+    const userSnap = await db.collection('users').where('__name__', 'in', userIds).get();
+    userSnap.forEach(d => users[d.id] = d.data());
+  }
+
+  res.json(works.map(w => ({ ...w, author: { id: w.author, name: users[w.author]?.name, email: users[w.author]?.email } })));
 };
 
 export const reviewCreativeWork = async (req, res) => {
   const { status, rejectionReason } = req.body;
-  const work = await CreativeWork.findById(req.params.id);
-  if (!work) throw new ApiError(404, 'Creative work not found');
+  const ref = db.collection('creativeWorks').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Work not found');
 
-  work.status = status;
-  if (rejectionReason) work.rejectionReason = rejectionReason;
-  await work.save();
+  const updates = { status, updatedAt: new Date().toISOString() };
+  if (rejectionReason) updates.rejectionReason = rejectionReason;
+  await ref.update(updates);
 
-  await Notification.create({
-    user: work.author,
-    title: `Creative Work ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-    message: status === 'approved' 
-      ? `Your work "${work.title}" has been published and is now visible to the community.`
-      : `Your work "${work.title}" was rejected. Reason: ${rejectionReason || 'Policy violation.'}`,
+  await db.collection('notifications').add({
+    user: doc.data().author,
+    title: `Creative Work ${status}`,
+    message: status === 'approved' ? `"${doc.data().title}" live.` : `"${doc.data().title}" rejected.`,
     type: 'creative',
+    createdAt: new Date().toISOString(),
+    read: false
   });
 
-  res.json(work);
+  res.json({ id: doc.id, ...doc.data(), ...updates });
 };
 
 export const deleteCreativeWork = async (req, res) => {
-  const work = await CreativeWork.findById(req.params.id);
-  if (!work) throw new ApiError(404, 'Creative work not found');
+  const ref = db.collection('creativeWorks').doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, 'Work not found');
 
-  await Notification.create({
-    user: work.author,
+  await db.collection('notifications').add({
+    user: doc.data().author,
     title: 'Content Moderated',
-    message: `Your creative work "${work.title}" has been removed by an administrator for violating community guidelines.`,
+    message: `Your work "${doc.data().title}" was removed by admin.`,
     type: 'creative',
+    createdAt: new Date().toISOString(),
+    read: false
   });
 
-  await work.deleteOne();
+  await ref.delete();
   res.json({ success: true });
 };
 
-// Secure User Deletion
 export const deleteUser = async (req, res) => {
   const { adminPassword } = req.body;
-  const admin = await User.findById(req.user._id);
+  const adminRef = db.collection('users').doc(req.user.id);
+  const adminDoc = await adminRef.get();
   
-  const isMatch = await admin.matchPassword(adminPassword);
-  if (!isMatch) throw new ApiError(401, 'Invalid admin password. Deletion unauthorized.');
+  const isMatch = await bcrypt.compare(adminPassword, adminDoc.data().password);
+  if (!isMatch) throw new ApiError(401, 'Unauthorized');
 
-  const user = await User.findById(req.params.id);
-  if (!user) throw new ApiError(404, 'User not found');
+  const userRef = db.collection('users').doc(req.params.id);
+  const userDoc = await userRef.get();
+  if (!userDoc.exists) throw new ApiError(404, 'User not found');
+  const userData = userDoc.data();
   
-  // PROTECTION: Prevent deleting the owner account
-  const isOwner = user.email === 'liyamu.owner@gmail.com' || user.badges?.owner;
-  if (isOwner) throw new ApiError(403, 'The Owner account cannot be deleted.');
+  if (userData.email === 'liyamu.owner@gmail.com' || userData.badges?.owner) throw new ApiError(403, 'Owner cannot be deleted.');
+  if (userData.role === 'admin') throw new ApiError(403, 'Admins cannot be deleted here.');
 
-  if (user.role === 'admin') throw new ApiError(403, 'Administrators cannot be deleted via this dashboard.');
-
-  // Notify user (simulated as we delete their account next)
-  // In a real app, an email would be sent here.
-
-  // 1. Cascade Delete
-  await Promise.all([
-    Book.deleteMany({ author: user._id }),
-    CreativeWork.deleteMany({ author: user._id }),
-    Review.deleteMany({ user: user._id }),
-    Notification.deleteMany({ user: user._id }),
-    Purchase.deleteMany({ user: user._id })
+  // Cascade
+  const batch = db.batch();
+  const [books, works, reviews, notifications, purchases] = await Promise.all([
+    db.collection('books').where('author', '==', req.params.id).get(),
+    db.collection('creativeWorks').where('author', '==', req.params.id).get(),
+    db.collection('reviews').where('user', '==', req.params.id).get(),
+    db.collection('notifications').where('user', '==', req.params.id).get(),
+    db.collection('purchases').where('buyer', '==', req.params.id).get()
   ]);
 
-  // 2. Soft-delete user for Audit or Hard-delete? User requested "remove all associated data" 
-  // but also "add a section to view deleted user accounts". This implies Soft Delete.
-  user.isDeleted = true;
-  user.deletedAt = new Date();
-  // Clear sensitive data
-  user.name = `[DELETED USER ${user._id.toString().slice(-4)}]`;
-  user.email = `deleted_${Date.now()}@liyamu.com`;
-  user.phone = 'N/A';
-  user.password = 'N/A';
-  user.profilePicture = null;
-  await user.save({ validateBeforeSave: false });
+  books.forEach(d => batch.delete(d.ref));
+  works.forEach(d => batch.delete(d.ref));
+  reviews.forEach(d => batch.delete(d.ref));
+  notifications.forEach(d => batch.delete(d.ref));
+  purchases.forEach(d => batch.delete(d.ref));
 
-  res.json({ success: true, message: 'User and all associated data permanently removed.' });
+  batch.update(userRef, {
+    isDeleted: true,
+    deletedAt: new Date().toISOString(),
+    name: `[DELETED USER]`,
+    email: `deleted_${Date.now()}@liyamu.com`,
+    password: 'N/A'
+  });
+
+  await batch.commit();
+  res.json({ success: true });
 };
 
 export const getDeletedUsers = async (req, res) => {
-  const users = await User.find({ isDeleted: true }).sort({ deletedAt: -1 });
-  res.json(users);
+  const snapshot = await db.collection('users').where('isDeleted', '==', true).orderBy('deletedAt', 'desc').get();
+  res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 };

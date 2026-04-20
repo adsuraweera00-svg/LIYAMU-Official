@@ -207,7 +207,7 @@ const BuyCreditsPage = () => {
                </div>
                <div className="space-y-4">
                   {pendingRequests.map(req => (
-                    <div key={req._id} className="flex flex-col md:flex-row gap-4 md:items-center justify-between p-6 rounded-2xl bg-white border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+                    <div key={req.id} className="flex flex-col md:flex-row gap-4 md:items-center justify-between p-6 rounded-2xl bg-white border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
                        <div className="flex items-center gap-4">
                           <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 dark:bg-slate-800">
                              <img src={req.slipUrl} alt="" className="h-10 w-10 object-cover rounded-lg opacity-40 hover:opacity-100 transition-opacity cursor-zoom-in" />
@@ -239,7 +239,7 @@ const BuyCreditsPage = () => {
              <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white mb-8">Completed Transactions</h3>
              <div className="space-y-4">
                 {transactionHistory.map(tx => (
-                  <div key={tx._id} className="flex items-center justify-between p-6 rounded-2xl bg-slate-50 border border-transparent hover:border-slate-100 transition-all dark:bg-slate-800/50 dark:hover:border-slate-700">
+                  <div key={tx.id} className="flex items-center justify-between p-6 rounded-2xl bg-slate-50 border border-transparent hover:border-slate-100 transition-all dark:bg-slate-800/50 dark:hover:border-slate-700">
                      <div className="flex items-center gap-4">
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
                           tx.type === 'purchase' || tx.type === 'admin_add' || tx.type === 'refund' 

@@ -1,34 +1,48 @@
-import Notification from '../models/Notification.js';
-import User from '../models/User.js';
+import { adminFirestore } from '../config/firebase.js';
 import { sendAdminAlert, formatTelegramMessage } from './telegram.js';
 
+const db = adminFirestore();
+
 /**
- * Notifies all administrators and sends a single synchronized Telegram alert.
+ * Notifies all administrators and sends a synchronized Telegram alert.
  */
 export const notifyAdmins = async ({ title, message, type = 'info', metadata = {} }) => {
-  const admins = await User.find({ role: 'admin' });
-  if (admins.length === 0) return;
+  const adminsSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+  if (adminsSnapshot.empty) return;
 
-  // 1. Send ONE Telegram alert (using the first admin's notification as a template)
+  // 1. Send ONE Telegram alert
   const telegramMessage = formatTelegramMessage({ title, message, metadata });
   sendAdminAlert(telegramMessage).catch(err => console.error('Telegram alert failed:', err));
 
-  // 2. Create DB notifications for ALL admins
-  // We add a flag 'telegramSent: true' to metadata to prevent the global hook from double-sending
-  const notificationPromises = admins.map(admin => Notification.create({
-    user: admin._id,
-    title,
-    message,
-    type,
-    metadata: { ...metadata, telegramSent: true }
-  }));
+  // 2. Create DB notifications for ALL admins in a batch
+  const batch = db.batch();
+  adminsSnapshot.forEach(doc => {
+    const notifRef = db.collection('notifications').doc();
+    batch.set(notifRef, {
+      user: doc.id,
+      title,
+      message,
+      type,
+      metadata: { ...metadata, telegramSent: true },
+      createdAt: new Date().toISOString(),
+      read: false
+    });
+  });
 
-  await Promise.all(notificationPromises);
+  await batch.commit();
 };
 
 /**
  * Standard trigger for single users
  */
 export const triggerNotification = async ({ userId, title, message, type = 'info', metadata = {} }) => {
-  return await Notification.create({ user: userId, title, message, type, metadata });
+  return await db.collection('notifications').add({
+    user: userId,
+    title,
+    message,
+    type,
+    metadata,
+    createdAt: new Date().toISOString(),
+    read: false
+  });
 };

@@ -32,8 +32,8 @@ const WorkDetailsPage = () => {
       const { data } = await api.get(`/creative/${id}`);
       setWork({
         ...data,
-        isLiked: auth ? data.likes?.includes(auth._id) : false,
-        isBookmarked: auth ? auth.bookmarkedWorks?.includes(data._id) : false
+        isLiked: auth ? data.likes?.includes(auth.id) : false,
+        isBookmarked: auth ? auth.bookmarkedWorks?.includes(data.id) : false
       });
     } catch (err) {
       console.error(err);
@@ -205,7 +205,7 @@ const WorkDetailsPage = () => {
               <div className="space-y-4">
                  {work.comments?.map((comment, i) => (
                    <motion.div 
-                     key={comment._id}
+                     key={comment.id}
                      initial={{ opacity: 0, x: -10 }}
                      animate={{ opacity: 1, x: 0 }}
                      transition={{ delay: i * 0.05 }}
@@ -258,7 +258,7 @@ const WorkDetailsPage = () => {
               </div>
 
               <Link 
-                to={`/dashboard/authors/${work.author?._id}`}
+                to={`/dashboard/authors/${work.author?.id}`}
                 className="block w-full py-3 rounded-xl bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 transition-all"
               >
                 View Profile
