@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/api/index.js"
+      "destination": "/api/index.js"
     },
     {
       "source": "/uploads/(.*)",
@@ -13,16 +13,5 @@
       "source": "/(.*)",
       "destination": "/frontend/dist/$1"
     }
-  ],
-  "experimentalServices": {
-    "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
-      "framework": "vite"
-    },
-    "backend": {
-      "entrypoint": "backend",
-      "routePrefix": "/_/backend"
-    }
-  }
+  ]
 }

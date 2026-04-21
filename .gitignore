@@ -39,3 +39,4 @@ backend/uploads/*
 # Misc
 .cache/
 *.pem
+.vercel
